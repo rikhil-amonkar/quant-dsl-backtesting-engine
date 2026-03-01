@@ -1,0 +1,7 @@
+# virtual env + keys
+venv/
+env/
+.venv*
+.env*
+
+# other

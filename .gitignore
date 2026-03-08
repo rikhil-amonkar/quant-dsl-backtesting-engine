@@ -6,3 +6,7 @@ env/
 
 # cpp compiled programs
 *.out
+
+# workspace configs
+*.vscode
+*.clangd

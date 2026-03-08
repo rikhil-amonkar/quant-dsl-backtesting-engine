@@ -7,8 +7,6 @@ INDICATOR vol_avg SMA volume 3
 ENTRY long crossover short_sma long_sma AND volume > vol_avg
 
 EXIT close_position crossunder short_sma long_sma
-EXIT close_position close <= entry_price * 0.97
+EXIT close_position close <= entry_price*0.97
 
-POSITION size_percent 100
-POSITION max_positions 1
-POSITION allow_short false
+POSITION size_percent 100 max_positions 1 allow_short false

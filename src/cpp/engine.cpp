@@ -5,6 +5,7 @@
 #include <fstream>
 #include <sstream>
 #include <algorithm>
+#include <iterator>
 
 using namespace std;
 
@@ -85,8 +86,6 @@ int get_data_index(string source) {
 
 }
 
-// 
-
 // compute operand values from condition parts
 float evaluate_condition_vals(
     int curr_day, 
@@ -96,7 +95,7 @@ float evaluate_condition_vals(
     array<string, 5> bar_fields
 ) {
 
-    auto search_it = find(start(bar_fields), end(bar_fields), operand);  // search for operand
+    auto search_it = find(begin(bar_fields), end(bar_fields), operand);  // search for operand
     
     if (search_it != end(bar_fields)) {  // case: in bar fields
         int source_index = get_data_index(operand);  // get op index from data
@@ -107,6 +106,62 @@ float evaluate_condition_vals(
 
 }
 
+// check if condition expression is true/false (crossover/crossunder)
+bool cross_condition_operation(
+    float left_op_val, float right_op_val, string operation,
+    int curr_day, string left_operand, string right_operand, 
+    map<string, float> previous_values, 
+    map<int, vector<int>> market_data, 
+    array<string, 5> bar_fields
+) {
+
+    int prev_day = curr_day - 1;
+
+    // using previous day --> "current values" equiv
+    float prev_left_val = evaluate_condition_vals(  // prev day left op val
+        prev_day, left_operand, previous_values, market_data, bar_fields
+    );
+    float prev_right_val = evaluate_condition_vals(  // prev day right op val
+        prev_day, right_operand, previous_values, market_data, bar_fields
+    );
+
+    // validate comparison ops
+    if (operation == "crossunder") {  // crossover --> left <= right prev, left > right curr
+        if (prev_left_val <= prev_right_val && left_op_val > right_op_val) {
+            return true;
+        }
+    } else {  // crossunder --> left >= right prev, left < right curr
+        if (prev_left_val >= prev_right_val && left_op_val < right_op_val) {
+            return true;
+        }
+    }
+    return false;  // op not true
+}
+
+// check if condition expression is true/false (only >, <, >=, <= ops)
+bool basic_condition_operation(float left_op_val, float right_op_val, string operation) {
+
+    // validate comparison ops
+    if (operation == ">") {
+        if (left_op_val > right_op_val) {
+            return true;
+        }
+    } else if (operation == ">=") {
+        if (left_op_val >= right_op_val) {
+            return true;
+        }
+    } else if (operation == "<") {
+        if (left_op_val < right_op_val) {
+            return true;
+        }
+    } else {  // "<="
+        if (left_op_val <= right_op_val) {
+            return true;
+        }
+    }
+    return false;  // op not true
+}
+
 // compute indicator values from strategy
 float compute_indicator(
     map<int, vector<int>> market_data, 
@@ -115,7 +170,7 @@ float compute_indicator(
 ) {
 
     float value{};
-    int source_index = get_data_index(string source);  // get data index
+    int source_index = get_data_index(source);  // get data index
 
     // define time interval for compute
     int start_day = curr_day - period + 1;
@@ -125,7 +180,7 @@ float compute_indicator(
     if (type == "SMA") {
         float total_sum{};  // 0.0f
         for (int i = start_day; i <= end_day; i++) {
-            total_sum += market_data[i][source_index];
+            total_sum += market_data[i][source_index];  // day, bar field
         }
         value = total_sum / period;  // short sma 
     }
@@ -267,6 +322,7 @@ int main() {
 
     // store updates indicator values
     map<string, float> current_values;
+    map<string, float> previous_values;
     float value{};
     int min_start_day{};  // set to 0
 
@@ -310,7 +366,7 @@ int main() {
             value = compute_indicator(
                 market_data, curr_day, indicator.type, indicator.source, indicator.period
             );
-            current_values[indicators.name] = value;  // store
+            current_values[indicator.name] = value;  // store
             cout << "Indicator " + indicator.name + ": " + to_string(value) << endl;
         }
 
@@ -325,8 +381,29 @@ int main() {
             float right_val = evaluate_condition_vals(  // right op val
                 curr_day, right_operand, current_values, market_data, bar_fields
             );
-            bool condition_res = perform_condition_operation()  // TODO: finish this op exec func
+
+            bool condition_res{};
+            if (operation == "crossover" || operation == "crossunder") {  // case: cross ops
+                cout << "Entry Rule (Cross): " + operation << endl;
+                condition_res = cross_condition_operation(
+                    left_val, right_val, operation,
+                    curr_day, left_operand, right_operand, 
+                    previous_values, market_data, bar_fields
+                );
+            } else {  // case: (>, <, >=, <=) --> not cross ops
+                cout << "Entry Rule (Basic): " + to_string(left_val) + " " + operation + " " + to_string(right_val) << endl;
+                condition_res = basic_condition_operation(left_val, right_val, operation);
+            }
+            cout << "Condition (0,1): " << condition_res << endl;
+
+            // TODO: use entry rule parent operator to check condition results
+            //* (possibly store all bool conditions in vector, then check with AND if, and a OR if respectively?? idk)
+
         }
+
+        // update previous day values
+        previous_values = current_values;  // after using
+
     }
 
     return 0;

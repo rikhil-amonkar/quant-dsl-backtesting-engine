@@ -64,6 +64,18 @@ map<int, vector<int>> market_data = {  // ordered hashmap
     {10, {99, 101, 95, 97, 2800}},
 };
 
+// check of conditions match parent operator
+bool validate_condition_operator(bool con_a, bool con_b, string logic_op) {
+
+    if (logic_op == "AND") {
+        return con_a && con_b;
+    }
+    else {
+        return con_a || con_b;
+    }
+
+}
+
 // get market data index from hashmap layout
 int get_data_index(string source) {
 
@@ -370,6 +382,8 @@ int main() {
             cout << "Indicator " + indicator.name + ": " + to_string(value) << endl;
         }
 
+        vector<bool> condition_outcomes{};  // store condition true/false
+
         // check if entry rule is valid
         for (auto condition : strategy.entry_rule.conditions) {
             string left_operand = condition.left_operand;
@@ -396,8 +410,17 @@ int main() {
             }
             cout << "Condition (0,1): " << condition_res << endl;
 
-            // TODO: use entry rule parent operator to check condition results
-            //* (possibly store all bool conditions in vector, then check with AND if, and a OR if respectively?? idk)
+            condition_outcomes.push_back(condition_res);  // store bool
+
+        //! need to improve to handle multiple conditions and operators (currently only 2) -> bad long term
+        // check entry rule conditions with operator
+        if (validate_condition_operator(
+            condition_outcomes[0], 
+            condition_outcomes[1], 
+            strategy.entry_rule.logic_operator  // AND/OR
+        )) {
+            cout << "We can enter on Day: " + to_string(curr_day) << endl;
+        }
 
         }
 

@@ -255,9 +255,16 @@ string parse_rules(string text_line, Strategy& strategy) {  // ref to modify -> 
         ExitRules exit_rules;  // init
         Conditions entry_conditions;  // init
         exit_rules.action = parts[1];
-        entry_conditions.operation = parts[2];
-        entry_conditions.left_operand = parts[3];
-        entry_conditions.right_operand = parts[4];
+        if (parts[2] == "crossover" || parts[2] == "crossunder")  // contains cross op
+        {  // case: op, left, right
+            entry_conditions.operation = parts[2];
+            entry_conditions.left_operand = parts[3];
+            entry_conditions.right_operand = parts[4];
+        } else {  // case: left, op, right
+            entry_conditions.operation = parts[3];
+            entry_conditions.left_operand = parts[2];
+            entry_conditions.right_operand = parts[4];
+        }
         exit_rules.conditions.push_back(entry_conditions);  // append
         strategy.exit_rules.push_back(exit_rules);
         return "EXIT " + exit_rules.action;
@@ -314,7 +321,8 @@ int main() {
     int min_start_day{};  // set to 0
 
     bool in_entry_cycle = false;  // entry state
-    float pnl{};  // profit/loss
+    float curr_entry_pnl{};  // track entry session
+    float pnl{};  // final profit/loss
 
     // immutable array to define possible bar fields
     const array<string, 5> bar_fields = {"open", "high", "low", "close", "volume"};
@@ -383,6 +391,7 @@ int main() {
             strategy.entry_rule.logic_operator  // AND/OR
         ) && !in_entry_cycle) {  // if not already entered
             cout << "Day: " << curr_day << " passed the entry rule, so we can enter." << endl;
+            curr_entry_pnl = 0;  // reset 
             in_entry_cycle = true;
         }
 
@@ -417,18 +426,28 @@ int main() {
                 exit_condition_outcomes.end(), 
                 [](bool b){ return b; }  // bool val
             );
-            if (exit_true) {  // case: exit rule hit
+
+            //! need to not hardcode last day, figure way to get last day of data (hashmap)
+            // TODO: possibly use an iterator initially to do so ^^^^
+            if (curr_day == 15) {  // case: hit last day
+                cout << "End of backtest reached, search days ended." << endl;
+                pnl += curr_entry_pnl;  // add to final pnl
+            }
+            else if (exit_true) {  // case: exit rule hit
                 cout << "Exit rule has been hit, need to break out of entry." << endl;
+                pnl += curr_entry_pnl;  // add to final pnl
+                in_entry_cycle = false;  // exit cycle
             } else {  // case: continue
-                pnl += open_val;  // add price
+                curr_entry_pnl += open_val;  // running cycle sum
+
             }
 
         }
 
+        cout << "Current PnL: $" << curr_entry_pnl << endl;
+
         // update previous day values
         previous_values = current_values;  // after using
-
-        cout << "Current PnL: $" << pnl << endl;
 
     }
 

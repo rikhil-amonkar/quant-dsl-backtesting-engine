@@ -7,47 +7,11 @@
 #include <algorithm>
 #include <iterator>
 
+#include "structs.h"
+
 using namespace std;
 
 // run command: g++ -std=c++20 engine.cpp -o engine.out && ./engine.out
-
-struct Conditions {
-    string operation;
-    string left_operand;
-    string right_operand;
-};
-
-struct Indicators {
-    string name;
-    string type;
-    string source;
-    int period;
-};
-
-struct EntryRule {
-    string direction;  // long/short
-    vector<Conditions> conditions; 
-    string logic_operator;  // AND,OR
-};
-
-struct ExitRules {
-    string action;
-    vector<Conditions> conditions;
-};
-
-struct PositionSettings {
-    float size_percentage;
-    int max_positions;
-    bool allow_short;  // yes/no
-};
-
-struct Strategy {
-    string name;  // strat
-    vector<Indicators> indicators;  // SMA
-    EntryRule entry_rule;  // single rule
-    vector<ExitRules> exit_rules;
-    PositionSettings pos_settings;  // thresholds
-};
 
 //! IMPROVE: temp data --> replace with webscraped later
 // temp market data : day, [open, high, low, close, volume]
@@ -62,6 +26,11 @@ map<int, vector<int>> market_data = {  // ordered hashmap
     {8, {105, 106, 101, 102, 2200}},
     {9, {102, 103, 98, 99, 2500}},
     {10, {99, 101, 95, 97, 2800}},
+    {11, {98, 100, 94, 96, 2700}},
+    {12, {97, 99, 93, 95, 2600}},
+    {13, {96, 98, 92, 94, 2550}},
+    {14, {95, 97, 91, 93, 2500}},
+    {15, {94, 96, 90, 92, 2450}},
 };
 
 // check of conditions match parent operator
@@ -215,6 +184,40 @@ vector<string> str_to_vec(string text_line) {
     return split_parts;
 }
 
+// handle operation function calls (consolidate)
+bool operation_handler(
+    string operation, int curr_day, 
+    string left_operand, string right_operand, 
+    map<string, float> current_values,
+    map<string, float> previous_values, 
+    map<int, vector<int>> market_data, 
+    array<string, 5> bar_fields
+) {
+    float left_val = evaluate_condition_vals(  // left op val
+        curr_day, left_operand, current_values, market_data, bar_fields
+    );
+    float right_val = evaluate_condition_vals(  // right op val
+        curr_day, right_operand, current_values, market_data, bar_fields
+    );
+
+    bool condition_res{};
+    // cout << "operation: " << operation << endl;
+    if (operation == "crossover" || operation == "crossunder") {  // case: cross ops
+        cout << "Rule (Cross): " + operation << endl;
+        condition_res = cross_condition_operation(
+            left_val, right_val, operation,
+            curr_day, left_operand, right_operand, 
+            previous_values, market_data, bar_fields
+        );
+    } else {  // case: (>, <, >=, <=) --> not cross ops
+        cout << "Rule (Basic): " + to_string(left_val) + " " + operation + " " + to_string(right_val) << endl;
+        condition_res = basic_condition_operation(left_val, right_val, operation);
+    }
+
+    return condition_res;  // store bool
+
+}
+
 //! IMPROVE: hardcoded for now need to use AST later 
 // parse rule from read line
 string parse_rules(string text_line, Strategy& strategy) {  // ref to modify -> not copy
@@ -252,8 +255,8 @@ string parse_rules(string text_line, Strategy& strategy) {  // ref to modify -> 
         ExitRules exit_rules;  // init
         Conditions entry_conditions;  // init
         exit_rules.action = parts[1];
-        entry_conditions.operation = parts[3];
-        entry_conditions.left_operand = parts[2];
+        entry_conditions.operation = parts[2];
+        entry_conditions.left_operand = parts[3];
         entry_conditions.right_operand = parts[4];
         exit_rules.conditions.push_back(entry_conditions);  // append
         strategy.exit_rules.push_back(exit_rules);
@@ -291,34 +294,6 @@ void read_strat(string filename, Strategy& strategy) {  // ref to struct
 
     cout << "\nCompiled Strategy..." << endl;
 
-    // cout << "\nStrategy: " + strategy.name << endl;
-
-    // cout << "Indicators:" << endl;
-    // for (auto indicator : strategy.indicators) {
-    //     cout << "   - " + indicator.name + " " + indicator.type + " " + indicator.source + " " + to_string(indicator.period) << endl;
-    // }
-
-    // cout << "Entry Rule:" << endl;
-    // cout << "   - " + strategy.entry_rule.direction + " " + strategy.entry_rule.logic_operator << endl;
-    // cout << "   - Conditions:" << endl;
-    // for (auto condition : strategy.entry_rule.conditions) {
-    //     cout << "       - " + condition.left_operand + " " + condition.operation + " " + condition.right_operand << endl;
-    // }
-
-    // cout << "Exit Rules:" << endl;
-    // for (auto rule : strategy.exit_rules) {
-    //     cout << "   - " + rule.action << endl;
-    //     cout << "   - Conditions:" << endl;
-    //     for (auto condition : rule.conditions) {
-    //         cout << "       - " + condition.left_operand + " " + condition.operation + " " + condition.right_operand << endl;
-    //     }
-    // }
-
-    // cout << "Position Settings:" << endl;
-    // cout << "   - " + to_string(strategy.pos_settings.size_percentage) << endl;
-    // cout << "   - " + to_string(strategy.pos_settings.max_positions) << endl;
-    // cout << "   - " + to_string(strategy.pos_settings.allow_short) << endl;
-
     strat_file.close();  // for memory space
 
 }
@@ -337,6 +312,9 @@ int main() {
     map<string, float> previous_values;
     float value{};
     int min_start_day{};  // set to 0
+
+    bool in_entry_cycle = false;  // entry state
+    float pnl{};  // profit/loss
 
     // immutable array to define possible bar fields
     const array<string, 5> bar_fields = {"open", "high", "low", "close", "volume"};
@@ -382,52 +360,79 @@ int main() {
             cout << "Indicator " + indicator.name + ": " + to_string(value) << endl;
         }
 
-        vector<bool> condition_outcomes{};  // store condition true/false
+        vector<bool> entry_condition_outcomes{};  // store condition true/false
 
         // check if entry rule is valid
         for (auto condition : strategy.entry_rule.conditions) {
             string left_operand = condition.left_operand;
             string right_operand = condition.right_operand;
             string operation = condition.operation;  // forms --> (left operator right)
-            float left_val = evaluate_condition_vals(  // left op val
-                curr_day, left_operand, current_values, market_data, bar_fields
-            );
-            float right_val = evaluate_condition_vals(  // right op val
-                curr_day, right_operand, current_values, market_data, bar_fields
+            bool entry_condition_res = operation_handler(
+                operation, curr_day, left_operand, right_operand, 
+                current_values, previous_values, market_data, bar_fields
             );
 
-            bool condition_res{};
-            if (operation == "crossover" || operation == "crossunder") {  // case: cross ops
-                cout << "Entry Rule (Cross): " + operation << endl;
-                condition_res = cross_condition_operation(
-                    left_val, right_val, operation,
-                    curr_day, left_operand, right_operand, 
-                    previous_values, market_data, bar_fields
-                );
-            } else {  // case: (>, <, >=, <=) --> not cross ops
-                cout << "Entry Rule (Basic): " + to_string(left_val) + " " + operation + " " + to_string(right_val) << endl;
-                condition_res = basic_condition_operation(left_val, right_val, operation);
-            }
-            cout << "Condition (0,1): " << condition_res << endl;
-
-            condition_outcomes.push_back(condition_res);  // store bool
+            cout << "Entry Condition (0,1): " << entry_condition_res << endl;
+            entry_condition_outcomes.push_back(entry_condition_res);  // store bool
 
         //! need to improve to handle multiple conditions and operators (currently only 2) -> bad long term
         // check entry rule conditions with operator
         if (validate_condition_operator(
-            condition_outcomes[0], 
-            condition_outcomes[1], 
+            entry_condition_outcomes[0], 
+            entry_condition_outcomes[1], 
             strategy.entry_rule.logic_operator  // AND/OR
-        )) {
-            cout << "We can enter on Day: " + to_string(curr_day) << endl;
+        ) && !in_entry_cycle) {  // if not already entered
+            cout << "Day: " << curr_day << " passed the entry rule, so we can enter." << endl;
+            in_entry_cycle = true;
         }
+
+        }
+
+        // check if currently entered
+        if (in_entry_cycle) {
+            cout << "In entry cycle..." << endl;
+
+            vector<bool> exit_condition_outcomes{};  // store condition true/false
+
+            // TODO: check exit conditions incase need to exit
+            for (auto exit_rule : strategy.exit_rules) {
+                cout << "Exit rule action: " + exit_rule.action << endl;
+                for (auto condition : exit_rule.conditions) {                    
+                    string left_operand = condition.left_operand;
+                    string right_operand = condition.right_operand;
+                    string operation = condition.operation;  // forms --> (left operator right)
+                    bool exit_condition_res = operation_handler(
+                        operation, curr_day, left_operand, right_operand, 
+                        current_values, previous_values, market_data, bar_fields
+                    );
+
+                    cout << "Exit Condition (0,1): " << exit_condition_res << endl;
+                    exit_condition_outcomes.push_back(exit_condition_res);  // store bool
+                }
+            }
+
+            // any instance of exit rule being true
+            bool exit_true = any_of(  // lambda func
+                exit_condition_outcomes.begin(), 
+                exit_condition_outcomes.end(), 
+                [](bool b){ return b; }  // bool val
+            );
+            if (exit_true) {  // case: exit rule hit
+                cout << "Exit rule has been hit, need to break out of entry." << endl;
+            } else {  // case: continue
+                pnl += open_val;  // add price
+            }
 
         }
 
         // update previous day values
         previous_values = current_values;  // after using
 
+        cout << "Current PnL: $" << pnl << endl;
+
     }
+
+    cout << "Final PnL: $" << pnl << endl; 
 
     return 0;
 }

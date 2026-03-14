@@ -246,15 +246,23 @@ float compute_share_quantity(float entry_price, float capital, float size_percen
 }
 
 // compute pnl from current entry/exit cycle
-float compute_curr_pnl(
+float compute_current_pnl(
     int share_quantity, float entry_price, float exit_price, string asset_direction
 ) {
 
+    float current_pnl{};
+
     if (asset_direction == "long") {  // case: long term
-        return (exit_price - entry_price) * share_quantity;
+        current_pnl = (exit_price - entry_price) * share_quantity;
     } else {  // case: short term (flip order)
-        return (entry_price - exit_price) * share_quantity;
+        current_pnl = (entry_price - exit_price) * share_quantity;
     }
+
+    cout << "Entry Price: " << entry_price << endl;
+    cout << "Exit Price: " << exit_price << endl;
+    cout << "Shares: " << share_quantity << endl;
+    cout << "Current PnL: $" << current_pnl << endl;
+    return current_pnl;
 
 }
 
@@ -361,9 +369,11 @@ int main() {
     int min_start_day{};  // start to 0
 
     bool in_entry_cycle = false;
-    float curr_updated_pnl{};  // track entry session
-    float pnl{};  // final profit/loss
-    float iter_pnl{};
+    float pnl_update_val{};  // track entry session
+    float final_pnl{};  // final profit/loss
+
+    float unrealized_pnl{};  // exit
+    float realized_pnl{};  // in trade
 
     float price_entered_at{};
     float price_exited_at{};
@@ -439,10 +449,10 @@ int main() {
             entry_condition_outcomes[1], 
             strategy.entry_rule.logic_operator  // AND/OR
         ) && !in_entry_cycle) {  // if not already entered
-            cout << "Day: " << curr_day << " passed the entry rule, so we can enter." << endl;
-            curr_updated_pnl = 0.0;
+            cout << "Day: " << curr_day << " passed the entry rule...entering trade." << endl;
+            pnl_update_val = 0.0;
             price_exited_at = 0.0;
-            price_entered_at = open_val;  // update
+            price_entered_at = open_val;  // bar entry
             in_entry_cycle = true;
         }
 
@@ -450,7 +460,7 @@ int main() {
 
         // check if currently entered
         if (in_entry_cycle) {
-            cout << "In entry cycle..." << endl;
+            cout << "Inside of an entry cycle trade..." << endl;
 
             vector<bool> exit_condition_outcomes{};  // store condition true/false
 
@@ -488,41 +498,46 @@ int main() {
                 [](bool b){ return b; }  // bool val
             );
 
+            // compute num shares to use in trade
+            share_quantity = compute_share_quantity(
+                price_entered_at, capital, strategy.pos_settings.size_percentage
+            );
+
             //! need to not hardcode last day, figure way to get last day of data (hashmap)
             // TODO: possibly use an iterator initially to do so ^^^^
-            if (curr_day == 15) {  // case: hit last day
-                cout << "End of backtest reached, search days ended." << endl;
-                pnl += curr_updated_pnl;  // add to final pnl
+            if (curr_day == 15) {  // case: hit last day (while still in trade)
+                cout << "End of search days reached while still in trade." << endl;
+                final_pnl += pnl_update_val;  // add to final pnl
             }
             else if (exit_true) {  // case: exit rule hit
-                cout << "Exit rule has been hit, need to break out of entry." << endl;
-                pnl += curr_updated_pnl;  // add to final pnl
-                price_entered_at = 0.0;
-                price_exited_at = close_val;
-                in_entry_cycle = false;  // exit cycle
-            } else {  // case: continue
-                share_quantity = compute_share_quantity(
-                    price_entered_at, capital, strategy.pos_settings.size_percentage
-                );
-                cout << "Share Quantity: " << share_quantity << endl;
-                iter_pnl = compute_curr_pnl(
+                cout << "Exit rule has been hit while in trade." << endl;
+                price_exited_at = close_val;  // bar close
+                realized_pnl = compute_current_pnl(
                     share_quantity, price_entered_at, 
                     price_exited_at, strategy.entry_rule.direction
                 );
-                curr_updated_pnl += iter_pnl;  // running cycle sum
+                final_pnl += realized_pnl;  // add to final pnl
+                pnl_update_val = 0.0;  // not in trade
+                price_entered_at = 0.0;
+                in_entry_cycle = false;  // exit cycle
+            } else {  // case: continue
+                cout << "Still in trade. Adding unrealized pnl." << endl;
+                unrealized_pnl = compute_current_pnl(
+                    share_quantity, price_entered_at, 
+                    close_val, strategy.entry_rule.direction
+                );
+                pnl_update_val += unrealized_pnl;  // running cycle sum
 
             }
         }
-
-        cout << "Current PnL: $" << curr_updated_pnl << endl;
 
         // update previous day values
         previous_values = current_values;  // after using
 
     }
 
-    cout << "\nFinal PnL: $" << pnl << endl;
-    float remaining_capital = capital + pnl; 
+    cout << "\nFinal PnL: $" << final_pnl << endl;
+    float remaining_capital = capital + final_pnl; 
     cout << "Remaining Capital: $" << remaining_capital << endl;
 
     return 0;

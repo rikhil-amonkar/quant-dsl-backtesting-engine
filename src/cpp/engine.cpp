@@ -6,6 +6,8 @@
 #include <sstream>
 #include <algorithm>
 #include <iterator>
+#include <optional>
+#include <cmath>
 
 #include "structs.h"
 
@@ -13,7 +15,7 @@ using namespace std;
 
 // run command: g++ -std=c++20 engine.cpp -o engine.out && ./engine.out
 
-//! IMPROVE: temp data --> replace with webscraped later
+//! IMPROVE: temp data --> replace with webscraped data later
 // temp market data : day, [open, high, low, close, volume]
 map<int, vector<int>> market_data = {  // ordered hashmap
     {1, {100, 103, 99, 102, 1000}},
@@ -73,12 +75,17 @@ float evaluate_condition_vals(
     string operand, 
     map<string, float> current_values, 
     map<int, vector<int>> market_data,
-    array<string, 5> bar_fields
+    array<string, 5> bar_fields,
+    optional<float> entry_price = nullopt  //! fix later (hardcoded)
 ) {
 
     auto search_it = find(begin(bar_fields), end(bar_fields), operand);  // search for operand
     
-    if (search_it != end(bar_fields)) {  // case: in bar fields
+    // TODO: be able to handle equations too
+    //! remove hardcoded condition for exit equation --> need to breakdown somehow
+    if (entry_price.has_value()) {  // case: sub-equation
+        return entry_price.value() * 0.97;
+    } else if (search_it != end(bar_fields)) {  // case: in bar fields
         int source_index = get_data_index(operand);  // get op index from data
         return market_data[curr_day][source_index];
     } else {  // case: in curr vals map
@@ -191,14 +198,25 @@ bool operation_handler(
     map<string, float> current_values,
     map<string, float> previous_values, 
     map<int, vector<int>> market_data, 
-    array<string, 5> bar_fields
+    array<string, 5> bar_fields,
+    optional<float> entry_price = nullopt  //! fix later (hardcoded)
 ) {
+
+    float right_val{};
     float left_val = evaluate_condition_vals(  // left op val
         curr_day, left_operand, current_values, market_data, bar_fields
     );
-    float right_val = evaluate_condition_vals(  // right op val
-        curr_day, right_operand, current_values, market_data, bar_fields
-    );
+    if (entry_price.has_value()) {  // special case
+        right_val = evaluate_condition_vals(  // right op val
+            curr_day, right_operand, current_values, 
+            market_data, bar_fields, entry_price  // optional entry price
+        );
+    } else {
+        right_val = evaluate_condition_vals(  // right op val
+            curr_day, right_operand, current_values, 
+            market_data, bar_fields
+        );
+    }
 
     bool condition_res{};
     // cout << "operation: " << operation << endl;
@@ -215,6 +233,28 @@ bool operation_handler(
     }
 
     return condition_res;  // store bool
+
+}
+
+// compute share quantity to use for trade
+float compute_share_quantity(float entry_price, float capital, float size_percentage) {
+
+    float dollars_to_put = capital * (size_percentage / 100);  // from capital
+    int num_shares = static_cast<int>(round(dollars_to_put / entry_price));  // no user warning, floor round
+    return num_shares;
+
+}
+
+// compute pnl from current entry/exit cycle
+float compute_curr_pnl(
+    int share_quantity, float entry_price, float exit_price, string asset_direction
+) {
+
+    if (asset_direction == "long") {  // case: long term
+        return (exit_price - entry_price) * share_quantity;
+    } else {  // case: short term (flip order)
+        return (entry_price - exit_price) * share_quantity;
+    }
 
 }
 
@@ -318,11 +358,20 @@ int main() {
     map<string, float> current_values;
     map<string, float> previous_values;
     float value{};
-    int min_start_day{};  // set to 0
+    int min_start_day{};  // start to 0
 
-    bool in_entry_cycle = false;  // entry state
-    float curr_entry_pnl{};  // track entry session
+    bool in_entry_cycle = false;
+    float curr_updated_pnl{};  // track entry session
     float pnl{};  // final profit/loss
+    float iter_pnl{};
+
+    float price_entered_at{};
+    float price_exited_at{};
+
+    // portfolio info
+    float capital = 100000.0f;  // $$$
+    float share_quantity{};
+    cout << "Initial Capital: " << capital << endl;
 
     // immutable array to define possible bar fields
     const array<string, 5> bar_fields = {"open", "high", "low", "close", "volume"};
@@ -391,7 +440,9 @@ int main() {
             strategy.entry_rule.logic_operator  // AND/OR
         ) && !in_entry_cycle) {  // if not already entered
             cout << "Day: " << curr_day << " passed the entry rule, so we can enter." << endl;
-            curr_entry_pnl = 0;  // reset 
+            curr_updated_pnl = 0.0;
+            price_exited_at = 0.0;
+            price_entered_at = open_val;  // update
             in_entry_cycle = true;
         }
 
@@ -410,11 +461,21 @@ int main() {
                     string left_operand = condition.left_operand;
                     string right_operand = condition.right_operand;
                     string operation = condition.operation;  // forms --> (left operator right)
-                    bool exit_condition_res = operation_handler(
-                        operation, curr_day, left_operand, right_operand, 
-                        current_values, previous_values, market_data, bar_fields
-                    );
 
+                    //! remove hardcoded condition for exit equation --> need to breakdown somehow
+                    bool exit_condition_res{};
+                    if (right_operand == "entry_price*0.97") {  // case: sub-equation
+                        exit_condition_res = operation_handler(
+                            operation, curr_day, left_operand, right_operand, 
+                            current_values, previous_values, market_data, 
+                            bar_fields, price_entered_at  // optional entry price
+                        );
+                    } else {
+                        exit_condition_res = operation_handler(
+                            operation, curr_day, left_operand, right_operand, 
+                            current_values, previous_values, market_data, bar_fields
+                        );
+                    }
                     cout << "Exit Condition (0,1): " << exit_condition_res << endl;
                     exit_condition_outcomes.push_back(exit_condition_res);  // store bool
                 }
@@ -431,27 +492,38 @@ int main() {
             // TODO: possibly use an iterator initially to do so ^^^^
             if (curr_day == 15) {  // case: hit last day
                 cout << "End of backtest reached, search days ended." << endl;
-                pnl += curr_entry_pnl;  // add to final pnl
+                pnl += curr_updated_pnl;  // add to final pnl
             }
             else if (exit_true) {  // case: exit rule hit
                 cout << "Exit rule has been hit, need to break out of entry." << endl;
-                pnl += curr_entry_pnl;  // add to final pnl
+                pnl += curr_updated_pnl;  // add to final pnl
+                price_entered_at = 0.0;
+                price_exited_at = close_val;
                 in_entry_cycle = false;  // exit cycle
             } else {  // case: continue
-                curr_entry_pnl += open_val;  // running cycle sum
+                share_quantity = compute_share_quantity(
+                    price_entered_at, capital, strategy.pos_settings.size_percentage
+                );
+                cout << "Share Quantity: " << share_quantity << endl;
+                iter_pnl = compute_curr_pnl(
+                    share_quantity, price_entered_at, 
+                    price_exited_at, strategy.entry_rule.direction
+                );
+                curr_updated_pnl += iter_pnl;  // running cycle sum
 
             }
-
         }
 
-        cout << "Current PnL: $" << curr_entry_pnl << endl;
+        cout << "Current PnL: $" << curr_updated_pnl << endl;
 
         // update previous day values
         previous_values = current_values;  // after using
 
     }
 
-    cout << "Final PnL: $" << pnl << endl; 
+    cout << "\nFinal PnL: $" << pnl << endl;
+    float remaining_capital = capital + pnl; 
+    cout << "Remaining Capital: $" << remaining_capital << endl;
 
     return 0;
 }

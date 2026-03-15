@@ -36,12 +36,14 @@ map<int, vector<int>> market_data = {  // ordered hashmap
 };
 
 // check of conditions match parent operator
-bool validate_condition_operator(bool con_a, bool con_b, string logic_op) {
+bool validate_condition_operator(
+    bool con_a, bool con_b, string logic_op
+) {
 
     if (logic_op == "AND") {
         return con_a && con_b;
     }
-    else {
+    else {  // case: OR
         return con_a || con_b;
     }
 
@@ -84,7 +86,7 @@ float evaluate_condition_vals(
     // TODO: be able to handle equations too
     //! remove hardcoded condition for exit equation --> need to breakdown somehow
     if (entry_price.has_value()) {  // case: sub-equation
-        return entry_price.value() * 0.97;
+        return entry_price.value() * 0.97;  //! hardcoded part
     } else if (search_it != end(bar_fields)) {  // case: in bar fields
         int source_index = get_data_index(operand);  // get op index from data
         return market_data[curr_day][source_index];
@@ -127,7 +129,9 @@ bool cross_condition_operation(
 }
 
 // check if condition expression is true/false (only >, <, >=, <= ops)
-bool basic_condition_operation(float left_op_val, float right_op_val, string operation) {
+bool basic_condition_operation(
+    float left_op_val, float right_op_val, string operation
+) {
 
     // validate comparison ops
     if (operation == ">") {
@@ -142,7 +146,7 @@ bool basic_condition_operation(float left_op_val, float right_op_val, string ope
         if (left_op_val < right_op_val) {
             return true;
         }
-    } else {  // "<="
+    } else {  // case: "<="
         if (left_op_val <= right_op_val) {
             return true;
         }
@@ -179,6 +183,7 @@ float compute_indicator(
 
 // break line into vector parts
 vector<string> str_to_vec(string text_line) {
+
     vector<string> split_parts;
     string s;  // curr token
     string delim = " ";
@@ -189,6 +194,7 @@ vector<string> str_to_vec(string text_line) {
     }
 
     return split_parts;
+
 }
 
 // handle operation function calls (consolidate)
@@ -237,7 +243,9 @@ bool operation_handler(
 }
 
 // compute share quantity to use for trade
-float compute_share_quantity(float entry_price, float capital, float size_percentage) {
+float compute_share_quantity(
+    float entry_price, float capital, float size_percentage
+) {
 
     float dollars_to_put = capital * (size_percentage / 100);  // from capital
     int num_shares = static_cast<int>(round(dollars_to_put / entry_price));  // no user warning, floor round
@@ -247,11 +255,11 @@ float compute_share_quantity(float entry_price, float capital, float size_percen
 
 // compute pnl from current entry/exit cycle
 float compute_current_pnl(
-    int share_quantity, float entry_price, float exit_price, string asset_direction
+    int share_quantity, float entry_price, 
+    float exit_price, string asset_direction
 ) {
 
     float current_pnl{};
-
     if (asset_direction == "long") {  // case: long term
         current_pnl = (exit_price - entry_price) * share_quantity;
     } else {  // case: short term (flip order)
@@ -263,6 +271,14 @@ float compute_current_pnl(
     cout << "Shares: " << share_quantity << endl;
     cout << "Current PnL: $" << current_pnl << endl;
     return current_pnl;
+
+}
+
+// compute percent difference in pnl from initial capital
+float compute_pnl_percentage_diff(float remaining_capital, float capital) {
+
+    float price_diff = capital - remaining_capital;
+    return (price_diff / capital) * 100;  // 1-100% scale
 
 }
 
@@ -336,9 +352,8 @@ string parse_rules(string text_line, Strategy& strategy) {  // ref to modify -> 
 // read lines from strategy file
 void read_strat(string filename, Strategy& strategy) {  // ref to struct
 
-    string strat_text;
-
     // pull temp backtesting strategy file
+    string strat_text;
     ifstream strat_file("./temp_strat.txt");  // read, name, file
 
     while (getline(strat_file, strat_text)) {
@@ -348,7 +363,6 @@ void read_strat(string filename, Strategy& strategy) {  // ref to struct
     }
 
     cout << "\nCompiled Strategy..." << endl;
-
     strat_file.close();  // for memory space
 
 }
@@ -393,6 +407,10 @@ int main() {
         }
     }
 
+    // point to last day from ordered hashmap
+    auto last_day_ptr = prev(market_data.end());  // end = after last --> no data, prev
+    int last_day_in_data = last_day_ptr->first;  // deref
+
     // print each data point from hashmap
     for (auto market_val : market_data) {  // auto data type
         
@@ -414,7 +432,7 @@ int main() {
 
         // skip until valid day for indicator compute
         if (curr_day < min_start_day) {
-            cout << "Skipping day value. Need more info for compute." << endl;
+            cout << "No signal yet. Need more information. Skipping current day." << endl;
             continue;
         }
 
@@ -458,13 +476,13 @@ int main() {
 
         }
 
-        // check if currently entered
+        // check if currently entered trade
         if (in_entry_cycle) {
             cout << "Inside of an entry cycle trade..." << endl;
 
             vector<bool> exit_condition_outcomes{};  // store condition true/false
 
-            // TODO: check exit conditions incase need to exit
+            // check exit conditions incase trade is invalid
             for (auto exit_rule : strategy.exit_rules) {
                 cout << "Exit rule action: " + exit_rule.action << endl;
                 for (auto condition : exit_rule.conditions) {                    
@@ -503,9 +521,8 @@ int main() {
                 price_entered_at, capital, strategy.pos_settings.size_percentage
             );
 
-            //! need to not hardcode last day, figure way to get last day of data (hashmap)
-            // TODO: possibly use an iterator initially to do so ^^^^
-            if (curr_day == 15) {  // case: hit last day (while still in trade)
+            // state conditionals during entry
+            if (curr_day == last_day_in_data) {  // case: hit last day (while still in trade)
                 cout << "End of search days reached while still in trade." << endl;
                 final_pnl += pnl_update_val;  // add to final pnl
             }
@@ -536,9 +553,17 @@ int main() {
 
     }
 
+    float remaining_capital = capital + final_pnl;
+    float capital_diff_percent = compute_pnl_percentage_diff(remaining_capital, capital);  // % pnl
+
     cout << "\nFinal PnL: $" << final_pnl << endl;
-    float remaining_capital = capital + final_pnl; 
     cout << "Remaining Capital: $" << remaining_capital << endl;
+
+    if (remaining_capital < capital) {  // case: loss
+        cout << "Percent Difference in Capital: (-" << capital_diff_percent << "%)" << endl;
+    } else {  // case: gain
+        cout << "Percent Difference in Capital: (+" << capital_diff_percent << "%)" << endl;
+    }
 
     return 0;
 }

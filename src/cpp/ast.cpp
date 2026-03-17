@@ -15,8 +15,7 @@ enum class TokenType {  // enum --> type saftey
     KEYWORD,  // INDICATOR, EXIT
     NAME,  // sma_crossover_with_volume
     ASSIGNMENT,  // =
-    FUNCTION,  // SMA, crossunder
-    GROUPED,  // (close, 3)
+    FUNCTION,  // SMA(close, 3)
     VARIABLE,  // short_sma, long_sma
     INTEGER_LITERAL,  // 1, 2, 3
     FLOAT_LITERAL,  // 0.0, 1.0
@@ -140,7 +139,6 @@ private:  // local
             is_digit(input[position]) || 
             input[position] == '.'
         )) {
-
             if (input[position] == '.') {
                 if (has_decimal) {  // case: floats
                     break;
@@ -148,7 +146,6 @@ private:  // local
                 has_decimal = true;
             }
             position++;
-
         }
 
         return input.substr(start, (position - start));
@@ -156,31 +153,62 @@ private:  // local
     }
 
     // get functions inside of brackets
-    string get_next_grouped() {
+    string get_next_function() {
 
         size_t start = position;
-        bool end_delimiter = false;
-        
+        string prefix{};
+        size_t pos_changed{};
+
+        if (position > 0) {  // pos-1
+            while ((is_alpha_numeric(input[position-1]))) {  // before first bracket
+                position--;
+                pos_changed++;  // track
+            }
+            position += pos_changed;  // snap back pos
+        }
+
         while ((position < input.length()) && (
             is_alpha_numeric(input[position]) || 
             is_whitespace(input[position]) || 
             is_special_character(input[position]) ||
             is_arithmitic_operator(input[position])
         )) {
-
             if (input[position] == ')') {  // case: end bracket
-                if (end_delimiter) {
-                    break;
-                }
-                end_delimiter = true;
+                position++;
+                break;
             }
             position++;
-        
         }
 
-        return input.substr(start, (position - start));
+        return input.substr(start - pos_changed, (position - start + pos_changed));  // includes func name
     
     }
+
+    // // get equation inside of brackets
+    // string get_next_equation() {
+
+    //     size_t start = position;
+    //     bool end_delimiter = false;
+        
+    //     while ((position < input.length()) && (
+    //         is_alpha_numeric(input[position]) || 
+    //         is_whitespace(input[position]) || 
+    //         is_special_character(input[position]) ||
+    //         is_arithmitic_operator(input[position]) ||
+    //         is_comparison_operator(string(1, input[position]))
+    //     )) {
+    //         if (input[position] == ')') {  // case: end bracket
+    //             if (end_delimiter) {
+    //                 break;
+    //             }
+    //             end_delimiter = true;
+    //         }
+    //         position++;
+    //     }
+
+    //     return input.substr(start, (position - start));
+    
+    // }
     
     bool is_variable(const string& s) {  // strat vars
         return (
@@ -198,16 +226,17 @@ private:  // local
         );
     } 
     
-    bool is_function(const string& s) {  // func names
-        return (
+    // TODO: remove later --> replacing with a delimit decider func
+    // bool is_function(const string& s) {  // func names
+    //     return (
 
-            // prevents vars and names with same starts but not funcs
-            (s.find("SMA") != string::npos) ||
-            (s.find("crossunder") != string::npos) ||
-            (s.find("crossover") != string::npos)
+    //         // prevents vars and names with same starts but not funcs
+    //         (s.find("SMA") != string::npos) ||
+    //         (s.find("crossunder") != string::npos) ||
+    //         (s.find("crossover") != string::npos)
         
-        ); 
-    } 
+    //     ); 
+    // } 
     
     bool is_coverage(const string& s) {  // pre-line vars
         return (
@@ -234,16 +263,20 @@ public:  // callable outside
 
             char c = input[position];  // current character
 
-            if (is_whitespace(c)) {  // skip empty
-                position++;
-                continue;
+            if (position > 0) {
+                if (is_whitespace(c) && (!is_comma(input[position-1]))) {  // skip empty (except mid-func)
+                    position++;
+                    continue;
+                }
             }
 
-            if (is_delimiter(c)) {  // delims
-                string function = get_next_grouped();
-                Token token(TokenType::GROUPED, function);
-                tokens.emplace_back(token);
-                cout << "Grouped: " << function << endl;
+            if (c == '(') {  // opening delim
+                if (position > 0) {  // pos-1
+                    string function = get_next_function();  // has func name before bracket
+                    Token token(TokenType::FUNCTION, function);  // function
+                    tokens.emplace_back(token);
+                    cout << "Function: " << function << endl;
+                }
             }
 
             else if (c == '>' || c == '<') {  // comparison
@@ -251,12 +284,12 @@ public:  // callable outside
                     string temp;
                     temp += c;
                     temp += '=';
-                    Token token(TokenType::COMPARISON_OPERATOR, temp);
+                    Token token(TokenType::COMPARISON_OPERATOR, temp);  // comparison
                     tokens.emplace_back(token);
                     cout << "Comparison: " << temp << endl;
                     position++;  // single --> skip space
                 } else {  // case: normal
-                    Token token(TokenType::COMPARISON_OPERATOR, string(1, c));
+                    Token token(TokenType::COMPARISON_OPERATOR, string(1, c));  // comparison
                     tokens.emplace_back(token);
                     cout << "Comparison: " << c << endl;
                 }
@@ -264,14 +297,14 @@ public:  // callable outside
             }
 
             else if (is_arithmitic_operator(c)) {  // math
-                Token token(TokenType::ARITHMITIC_OPERATOR, string(1, c));
+                Token token(TokenType::ARITHMITIC_OPERATOR, string(1, c));  // arithmitic
                 tokens.emplace_back(token);
                 cout << "Arithmitic: " << c << endl;
                 position++;  // single --> skip space
             }
 
             else if (is_assignment(c)) {  // equals
-                Token token(TokenType::ASSIGNMENT, string(1, c));
+                Token token(TokenType::ASSIGNMENT, string(1, c));  // assignment
                 tokens.emplace_back(token);
                 cout << "Assignment: " << c << endl;
                 position++;  // single --> skip space
@@ -280,32 +313,30 @@ public:  // callable outside
             else if (is_alpha(c)) {
 
                 string word = get_next_word();  // complete word
-                
-                if (keywords.find(word) != keywords.end()) {  // keywords
-                    Token token(TokenType::KEYWORD, word);
+
+                if (keywords.find(word) != keywords.end()) {
+                    Token token(TokenType::KEYWORD, word);  // keywords
                     tokens.emplace_back(token);
                     cout << "Keyword: " << word << endl;
-                } else if (is_variable(word)) {  // variable
-                    Token token(TokenType::VARIABLE, word);
+                } else if (is_variable(word)) {
+                    Token token(TokenType::VARIABLE, word);  // variable
                     tokens.emplace_back(token);
                     cout << "Variable: " << word << endl;
-                } else if (is_coverage(word)) {  // coverage
-                    Token token(TokenType::COVERAGE, word);
+                } else if (is_coverage(word)) {
+                    Token token(TokenType::COVERAGE, word);  // coverage
                     tokens.emplace_back(token);
                     cout << "Coverage: " << word << endl;
-                } else if (is_logic_operator(word)) {  // logic
-                    Token token(TokenType::LOGIC_OPERATOR, word);
+                } else if (is_logic_operator(word)) {
+                    Token token(TokenType::LOGIC_OPERATOR, word);  // logic
                     tokens.emplace_back(token);
                     cout << "Logic: " << word << endl;
-                } else if (is_boolean_literal(word)) {  // bool
-                    Token token(TokenType::BOOL_LITERAL, word);
+                } else if (is_boolean_literal(word)) {
+                    Token token(TokenType::BOOL_LITERAL, word);  // bool
                     tokens.emplace_back(token);
                     cout << "Boolean: " << word << endl;
-                } else if (is_function(word)) {  // function
-                    Token token(TokenType::FUNCTION, word);
-                    tokens.emplace_back(token);
-                    cout << "Function: " << word << endl;
                 } else {
+                    Token token(TokenType::NAME, word);  // bool
+                    tokens.emplace_back(token);
                     cout << "Name: " << word << endl;
                 }
             }
@@ -313,7 +344,7 @@ public:  // callable outside
             // TODO: fix to not only catch above if statement faults
             // fallback for invalid inputs
             else {
-                Token token(TokenType::FUNCTION, string(1, c));   // char -> string copy
+                Token token(TokenType::UNKNOWN, string(1, c));   // char -> string copy (unknown)
                 tokens.emplace_back(token);
                 // cout << "Unknown: " << c << endl;
                 position++;
@@ -340,6 +371,7 @@ int main() {
 
     cout << "Parsed Strategy:\n" << endl;
     cout << full_text << endl;
+    cout << "============================\n" << endl;
 
     LexicalTokenParser token_parser(full_text);  // parse
 

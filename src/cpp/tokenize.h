@@ -1,3 +1,6 @@
+#ifndef TOKENIZE_TEXT_H
+#define TOKENIZE_TEXT_H
+
 #include <iostream>
 #include <string>
 #include <vector>
@@ -8,7 +11,8 @@
 
 using namespace std;
 
-// run command: g++ -std=c++20 ast.cpp -o ast.out && ./ast.out
+//! not used anymore, made this into a header file to use for other main
+// run command: g++ -std=c++20 tokenize.cpp -o tokenize.out && ./tokenize.out
 
 // define token types
 enum class TokenType {  // enum --> type saftey
@@ -183,32 +187,6 @@ private:  // local
         return input.substr(start - pos_changed, (position - start + pos_changed));  // includes func name
     
     }
-
-    // // get equation inside of brackets
-    // string get_next_equation() {
-
-    //     size_t start = position;
-    //     bool end_delimiter = false;
-        
-    //     while ((position < input.length()) && (
-    //         is_alpha_numeric(input[position]) || 
-    //         is_whitespace(input[position]) || 
-    //         is_special_character(input[position]) ||
-    //         is_arithmitic_operator(input[position]) ||
-    //         is_comparison_operator(string(1, input[position]))
-    //     )) {
-    //         if (input[position] == ')') {  // case: end bracket
-    //             if (end_delimiter) {
-    //                 break;
-    //             }
-    //             end_delimiter = true;
-    //         }
-    //         position++;
-    //     }
-
-    //     return input.substr(start, (position - start));
-    
-    // }
     
     bool is_variable(const string& s) {  // strat vars
         return (
@@ -218,6 +196,7 @@ private:  // local
             s == "size_percent" ||
             s == "max_positions" ||
             s == "allow_short" ||
+            s == "entry_price" ||
             s == "open" ||
             s == "close" || 
             s == "high" ||
@@ -225,18 +204,6 @@ private:  // local
             s == "volume"
         );
     } 
-    
-    // TODO: remove later --> replacing with a delimit decider func
-    // bool is_function(const string& s) {  // func names
-    //     return (
-
-    //         // prevents vars and names with same starts but not funcs
-    //         (s.find("SMA") != string::npos) ||
-    //         (s.find("crossunder") != string::npos) ||
-    //         (s.find("crossover") != string::npos)
-        
-    //     ); 
-    // } 
     
     bool is_coverage(const string& s) {  // pre-line vars
         return (
@@ -275,7 +242,7 @@ public:  // callable outside
                     string function = get_next_function();  // has func name before bracket
                     Token token(TokenType::FUNCTION, function);  // function
                     tokens.emplace_back(token);
-                    cout << "Function: " << function << endl;
+                    // cout << "Type: FUNCTION, Value: " << function << endl;
                 }
             }
 
@@ -286,12 +253,12 @@ public:  // callable outside
                     temp += '=';
                     Token token(TokenType::COMPARISON_OPERATOR, temp);  // comparison
                     tokens.emplace_back(token);
-                    cout << "Comparison: " << temp << endl;
+                    // cout << "Type: COMPARISON_OPERATOR, Value: " << temp << endl;
                     position++;  // single --> skip space
                 } else {  // case: normal
                     Token token(TokenType::COMPARISON_OPERATOR, string(1, c));  // comparison
                     tokens.emplace_back(token);
-                    cout << "Comparison: " << c << endl;
+                    // cout << "Type: COMPARISON_OPERATOR, Value: " << c << endl;
                 }
                 position++;  // single --> skip space
             }
@@ -299,54 +266,72 @@ public:  // callable outside
             else if (is_arithmitic_operator(c)) {  // math
                 Token token(TokenType::ARITHMITIC_OPERATOR, string(1, c));  // arithmitic
                 tokens.emplace_back(token);
-                cout << "Arithmitic: " << c << endl;
+                // cout << "Type: ARITHMITIC_OPERATOR, Value: " << c << endl;
                 position++;  // single --> skip space
             }
 
             else if (is_assignment(c)) {  // equals
                 Token token(TokenType::ASSIGNMENT, string(1, c));  // assignment
                 tokens.emplace_back(token);
-                cout << "Assignment: " << c << endl;
+                // cout << "Type: ASSIGNMENT, Value: " << c << endl;
                 position++;  // single --> skip space
             }
 
+            // alpha word check
             else if (is_alpha(c)) {
 
                 string word = get_next_word();  // complete word
 
+                if (input[position] == '(') {  // avoid repeat func names
+                    continue;  // stay on bracket
+                } 
+
                 if (keywords.find(word) != keywords.end()) {
                     Token token(TokenType::KEYWORD, word);  // keywords
                     tokens.emplace_back(token);
-                    cout << "Keyword: " << word << endl;
+                    // cout << "Type: KEYWORD, Value: " << word << endl;
                 } else if (is_variable(word)) {
                     Token token(TokenType::VARIABLE, word);  // variable
                     tokens.emplace_back(token);
-                    cout << "Variable: " << word << endl;
+                    // cout << "Type: VARIABLE, Value: " << word << endl;
                 } else if (is_coverage(word)) {
                     Token token(TokenType::COVERAGE, word);  // coverage
                     tokens.emplace_back(token);
-                    cout << "Coverage: " << word << endl;
+                    // cout << "Type: COVERAGE, Value: " << word << endl;
                 } else if (is_logic_operator(word)) {
                     Token token(TokenType::LOGIC_OPERATOR, word);  // logic
                     tokens.emplace_back(token);
-                    cout << "Logic: " << word << endl;
+                    // cout << "Type: LOGIC_OPERATOR, Value: " << word << endl;
                 } else if (is_boolean_literal(word)) {
                     Token token(TokenType::BOOL_LITERAL, word);  // bool
                     tokens.emplace_back(token);
-                    cout << "Boolean: " << word << endl;
+                    // cout << "Type: BOOL_LITERAL, Value: " << word << endl;
                 } else {
-                    Token token(TokenType::NAME, word);  // bool
+                    Token token(TokenType::NAME, word);  // name
                     tokens.emplace_back(token);
-                    cout << "Name: " << word << endl;
+                    // cout << "Type: NAME, Value: " << word << endl;
                 }
             }
 
-            // TODO: fix to not only catch above if statement faults
+            // float or int numeric check
+            else if (is_digit(c)) {
+                string number = get_next_number();
+                if (number.find('.') != string::npos) {
+                    Token token(TokenType::FLOAT_LITERAL, number);  // float
+                    tokens.emplace_back(token);
+                    // cout << "Type: FLOAT_LITERAL, Value: " << number << endl;
+                } else {
+                    Token token(TokenType::INTEGER_LITERAL, number);  // int
+                    tokens.emplace_back(token);
+                    // cout << "Type: INTEGER_LITERAL, Value: " << number << endl;
+                }
+            }
+
             // fallback for invalid inputs
             else {
                 Token token(TokenType::UNKNOWN, string(1, c));   // char -> string copy (unknown)
                 tokens.emplace_back(token);
-                // cout << "Unknown: " << c << endl;
+                // cout << "Type: UNKNOWN, Value: " << c << endl;
                 position++;
                 continue;
             }
@@ -359,24 +344,27 @@ public:  // callable outside
 
 };
 
-int main() {
+// TODO: remove whenever --> new main in engine
+// int main() {
 
-    string text;
-    ifstream strategy("./improved_temp_strat.txt");  // stream text
-    string full_text{};
+//     string text;
+//     ifstream strategy("./improved_temp_strat.txt");  // stream text
+//     string full_text{};
     
-    while (getline(strategy, text)) {
-        full_text += text + "\n";  // one large string
-    }
+//     while (getline(strategy, text)) {
+//         full_text += text + "\n";  // one large string
+//     }
 
-    cout << "Parsed Strategy:\n" << endl;
-    cout << full_text << endl;
-    cout << "============================\n" << endl;
+//     cout << "Parsed Strategy:\n" << endl;
+//     cout << full_text << endl;
+//     cout << "============================\n" << endl;
 
-    LexicalTokenParser token_parser(full_text);  // parse
+//     LexicalTokenParser token_parser(full_text);  // parse
 
-    vector<Token> tokens = token_parser.tokenize();  // tokenize
+//     vector<Token> tokens = token_parser.tokenize();  // tokenize
 
-    return 0;
+//     return 0;
 
-}
+// }
+
+#endif

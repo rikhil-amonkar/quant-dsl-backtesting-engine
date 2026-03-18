@@ -10,6 +10,7 @@
 #include <cmath>
 
 #include "structs.h"
+#include "tokenize.h"
 
 using namespace std;
 
@@ -282,70 +283,123 @@ float compute_pnl_percentage_diff(float remaining_capital, float capital) {
 
 }
 
-//! IMPROVE: hardcoded for now need to use AST later 
-// parse rule from read line
-string parse_rules(string text_line, Strategy& strategy) {  // ref to modify -> not copy
+// set parsed token rules to strategy struct members
+void parse_rules(vector<Token> tokens, Strategy& strategy) {  // ref to modify -> not copy
 
-    vector<string> parts = str_to_vec(text_line);  // break apart str
+    unordered_map<TokenType, vector<string>> token_values;  // key-pair for token and val
 
-    // npos = not found, check if keyword exists
-    if (parts[0] == "STRATEGY") {
-        strategy.name = parts[1];  // strat name
-        return "STRATEGY " + strategy.name;
-    } else if (parts[0] == "INDICATOR") {
-        Indicators indicator;  // init
-        indicator.name = parts[1];
-        indicator.type = parts[2];
-        indicator.source = parts[3];
-        indicator.period = stoi(parts[4]);  // str to int
-        strategy.indicators.push_back(indicator);  // append
-        return "INDICATOR " + indicator.name;
-    } else if (parts[0] == "ENTRY") {
-        EntryRule entry_rule;  // init
-        Conditions entry_conditions;  // init
-        entry_rule.direction = parts[1];
-        entry_rule.logic_operator = parts[5];
-        entry_conditions.operation = parts[2];
-        entry_conditions.left_operand = parts[3];
-        entry_conditions.right_operand = parts[4];
-        entry_rule.conditions.push_back(entry_conditions);  // append cond1
-        entry_conditions.operation = parts[7];
-        entry_conditions.left_operand = parts[6];
-        entry_conditions.right_operand = parts[8];
-        entry_rule.conditions.push_back(entry_conditions);  // append cond2
-        strategy.entry_rule = entry_rule;
-        return "ENTRY " + entry_rule.direction;
-    } else if (parts[0] == "EXIT") {
-        ExitRules exit_rules;  // init
-        Conditions entry_conditions;  // init
-        exit_rules.action = parts[1];
-        if (parts[2] == "crossover" || parts[2] == "crossunder")  // contains cross op
-        {  // case: op, left, right
-            entry_conditions.operation = parts[2];
-            entry_conditions.left_operand = parts[3];
-            entry_conditions.right_operand = parts[4];
-        } else {  // case: left, op, right
-            entry_conditions.operation = parts[3];
-            entry_conditions.left_operand = parts[2];
-            entry_conditions.right_operand = parts[4];
-        }
-        exit_rules.conditions.push_back(entry_conditions);  // append
-        strategy.exit_rules.push_back(exit_rules);
-        return "EXIT " + exit_rules.action;
-    } else if (parts[0] == "POSITION") {
-        PositionSettings pos_settings;  // init
-        pos_settings.size_percentage = stoi(parts[2]);  // str to int
-        pos_settings.max_positions = stoi(parts[4]);  // str to int
-        if (parts[6] == "true") {
-            pos_settings.allow_short = true;
-        } else {
-            pos_settings.allow_short = false;
-        }
-        strategy.pos_settings = pos_settings;
-        return "POSITION " + parts[2];
-    } else {
-        return "INVALID COMMAND";  // fallback
+    for (auto token : tokens) {  // token objects (type, value)
+
+        // TODO: not really working, gotta figure out how i am going to take the token value pairs and correlate them to the strategy struct properly
+        token_values[token.type].push_back(token.value);
+        cout << "===================" << endl;
+        for (auto val : token_values[token.type]) {
+            cout << "Val: " << val << endl;
+        }   
     }
+
+        //     if (token.type == TokenType::NAME) {
+    //         strategy.name = token.value;  // name
+    //         cout << "Type: NAME, Value: " << token.value << endl;
+    //     } else if (token.type == TokenType::KEYWORD) {
+    //         if (token.value == "INDICATOR") {
+    //             Indicators indicator;
+    //             indicator()
+    //         } 
+    //         strategy.name = token.value;  // keyword
+    //         cout << "Type: KEYWORD, Value: " << token.value << endl;
+    //     } else if (token.type == TokenType::FUNCTION) {
+    //         strategy.name = token.value;  // function
+    //         cout << "Type: FUNCTION, Value: " << token.value << endl;
+    //     } else if (token.type == TokenType::VARIABLE) {
+    //         strategy.name = token.value;  // variable
+    //         cout << "Type: VARIABLE, Value: " << token.value << endl;
+    //     } else if (token.type == TokenType::INTEGER_LITERAL) {
+    //         strategy.name = token.value;  // int
+    //         cout << "Type: INTEGER_LITERAL, Value: " << token.value << endl;
+    //     } else if (token.type == TokenType::FLOAT_LITERAL) {
+    //         strategy.name = token.value;  // float
+    //         cout << "Type: FLOAT_LITERAL, Value: " << token.value << endl;
+    //     } else if (token.type == TokenType::BOOL_LITERAL) {
+    //         strategy.name = token.value;  // bool
+    //         cout << "Type: BOOL_LITERAL, Value: " << token.value << endl;
+    //     } else if (token.type == TokenType::LOGIC_OPERATOR) {
+    //         strategy.name = token.value;  // logic op
+    //         cout << "Type: LOGIC_OPERATOR, Value: " << token.value << endl;
+    //     } else if (token.type == TokenType::COMPARISON_OPERATOR) {
+    //         strategy.name = token.value;  // comp op
+    //         cout << "Type: COMPARISON_OPERATOR, Value: " << token.value << endl;
+    //     } else if (token.type == TokenType::ARITHMITIC_OPERATOR) {
+    //         strategy.name = token.value;  // math op
+    //         cout << "Type: ARITHMITIC_OPERATOR, Value: " << token.value << endl;
+    //     } else if (token.type == TokenType::COVERAGE) {
+    //         strategy.name = token.value;  // coverage
+    //         cout << "Type: COVERAGE, Value: " << token.value << endl;
+    //     } else if (token.type == TokenType::ASSIGNMENT) {
+    //         strategy.name = token.value;  // assignment
+    //         cout << "Type: ASSIGNMENT, Value: " << token.value << endl;
+    //     } else if (token.type == TokenType::DELIMETER) {
+    //         strategy.name = token.value;  // delim
+    //         cout << "Type: DELIMETER, Value: " << token.value << endl;
+    //     } else {
+    //         cout << "Type: UNKNOWN, Value: " << token.value << endl;  // ignore invalid tokens
+    //     }
+
+    // TODO: use these conditionals below to fix above parser ^^^^^
+    // } else if (parts[0] == "INDICATOR") {
+    //     Indicators indicator;  // init
+    //     indicator.name = parts[1];
+    //     indicator.type = parts[2];
+    //     indicator.source = parts[3];
+    //     indicator.period = stoi(parts[4]);  // str to int
+    //     strategy.indicators.push_back(indicator);  // append
+    //     return "INDICATOR " + indicator.name;
+    // } else if (parts[0] == "ENTRY") {
+    //     EntryRule entry_rule;  // init
+    //     Conditions entry_conditions;  // init
+    //     entry_rule.direction = parts[1];
+    //     entry_rule.logic_operator = parts[5];
+    //     entry_conditions.operation = parts[2];
+    //     entry_conditions.left_operand = parts[3];
+    //     entry_conditions.right_operand = parts[4];
+    //     entry_rule.conditions.push_back(entry_conditions);  // append cond1
+    //     entry_conditions.operation = parts[7];
+    //     entry_conditions.left_operand = parts[6];
+    //     entry_conditions.right_operand = parts[8];
+    //     entry_rule.conditions.push_back(entry_conditions);  // append cond2
+    //     strategy.entry_rule = entry_rule;
+    //     return "ENTRY " + entry_rule.direction;
+    // } else if (parts[0] == "EXIT") {
+    //     ExitRules exit_rules;  // init
+    //     Conditions entry_conditions;  // init
+    //     exit_rules.action = parts[1];
+    //     if (parts[2] == "crossover" || parts[2] == "crossunder")  // contains cross op
+    //     {  // case: op, left, right
+    //         entry_conditions.operation = parts[2];
+    //         entry_conditions.left_operand = parts[3];
+    //         entry_conditions.right_operand = parts[4];
+    //     } else {  // case: left, op, right
+    //         entry_conditions.operation = parts[3];
+    //         entry_conditions.left_operand = parts[2];
+    //         entry_conditions.right_operand = parts[4];
+    //     }
+    //     exit_rules.conditions.push_back(entry_conditions);  // append
+    //     strategy.exit_rules.push_back(exit_rules);
+    //     return "EXIT " + exit_rules.action;
+    // } else if (parts[0] == "POSITION") {
+    //     PositionSettings pos_settings;  // init
+    //     pos_settings.size_percentage = stoi(parts[2]);  // str to int
+    //     pos_settings.max_positions = stoi(parts[4]);  // str to int
+    //     if (parts[6] == "true") {
+    //         pos_settings.allow_short = true;
+    //     } else {
+    //         pos_settings.allow_short = false;
+    //     }
+    //     strategy.pos_settings = pos_settings;
+    //     return "POSITION " + parts[2];
+    // } else {
+    //     return "INVALID COMMAND";  // fallback
+    // }
 
 }
 
@@ -354,15 +408,22 @@ void read_strat(string filename, Strategy& strategy) {  // ref to struct
 
     // pull temp backtesting strategy file
     string strat_text;
-    ifstream strat_file("./temp_strat.txt");  // read, name, file
+    ifstream strat_file(filename);  // read, name, file
+    string full_text{};
 
     while (getline(strat_file, strat_text)) {
-        if (!(strat_text.empty())) {  // skip empty lines
-            cout << parse_rules(strat_text, strategy) << endl;
-        }
+        full_text += strat_text + "\n";  // one large string
     }
 
-    cout << "\nCompiled Strategy..." << endl;
+    LexicalTokenParser token_parser(full_text);  // parse text
+    vector<Token> tokens = token_parser.tokenize();  // tokenize
+    parse_rules(tokens, strategy);  // assign tokens to strategy struct
+
+    cout << "\n============================\n" << endl;
+    cout << "PARSED STRATEGY:\n" << endl;
+    cout << full_text << endl;
+    cout << "============================\n" << endl;
+
     strat_file.close();  // for memory space
 
 }
@@ -373,7 +434,7 @@ int main() {
 
     Strategy strategy;  // init strategy
 
-    string filename = "./temp_strat.txt";
+    string filename = "./improved_temp_strat.txt";
     read_strat(filename, strategy);
 
     // store updates indicator values
@@ -395,7 +456,7 @@ int main() {
     // portfolio info
     float capital = 100000.0f;  // $$$
     float share_quantity{};
-    cout << "Initial Capital: " << capital << endl;
+    cout << "Initial Capital: $" << capital << endl;
 
     // immutable array to define possible bar fields
     const array<string, 5> bar_fields = {"open", "high", "low", "close", "volume"};

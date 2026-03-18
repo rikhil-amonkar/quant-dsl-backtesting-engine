@@ -19,6 +19,10 @@ struct Indicators {
     string type;
     string source;
     int period;
+
+    Indicators(  // indicator constructor
+        string n, string t, string s, int p
+    ) : name(n), type(t), source(s), period(p) {};
 };
 
 // rule to enter backtest

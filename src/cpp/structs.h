@@ -11,6 +11,10 @@ struct Conditions {
     string operation;
     string left_operand;
     string right_operand;
+
+    Conditions(  // conditions constructor
+        string operation, string left_operand, string right_operand
+    ) : operation(o), left_operand(l), right_operand(r) {};
 };
 
 // vars used in rules (always updating)
@@ -30,12 +34,20 @@ struct EntryRule {
     string direction;  // long/short
     vector<Conditions> conditions; 
     string logic_operator;  // AND,OR
+
+    EntryRule(  // entry rules constructor
+        string direction, vector<Conditions> conditions, string logic_operator
+    ) : direction(d), conditions(c), logic_operator(l)
 };
 
 // when to exit backtest
 struct ExitRules {
     string action;
     vector<Conditions> conditions;
+
+    ExitRules(  // exit rules constructor
+        string action, vector<Conditions> conditions
+    ) : action(a), conditions(c) {};
 };
 
 // profit/loss marginal sizes
@@ -43,6 +55,10 @@ struct PositionSettings {
     float size_percentage;
     int max_positions;
     bool allow_short;  // yes/no
+
+    PositionSettings(  // position settings constructor
+        float size_percentage, int max_positions, bool allow_short
+    ) : size_percentage(s), max_positions(m), allow_short(a) {};
 };
 
 // parent struct strategy

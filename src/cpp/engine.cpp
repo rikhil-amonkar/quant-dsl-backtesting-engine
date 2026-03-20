@@ -1,5 +1,6 @@
 #include <iostream>
 #include <string>
+#include <tuple>
 #include <vector>
 #include <map>
 #include <fstream>
@@ -187,7 +188,6 @@ vector<string> str_to_vec(string text_line) {
 
     vector<string> split_parts;
     string s;  // curr token
-    string delim = " ";
     stringstream stream(text_line);  // input stream
     
     while (stream >> s) {  // bitwise char read
@@ -283,67 +283,165 @@ float compute_pnl_percentage_diff(float remaining_capital, float capital) {
 
 }
 
+// deconstruct function format
+auto breakdown_function_format(string function) {
+
+    // isolate name and arguments from delims
+    size_t open_index = function.find('(');
+    string name = function.substr(0, open_index);  // start, length
+    size_t close_index = function.find(')');
+    string args_str = function.substr(open_index + 1, close_index - open_index - 1);
+
+    vector<string> args;
+    stringstream stream(args_str);
+    string arg;
+    char delim = ',';
+
+    while (getline(stream, arg, delim)) {  // breakdown inner delims
+        args.push_back(arg);
+    }
+
+    // get arguments
+    string arg_a = args[0];
+    int arg_b = stoi(args[1]);
+
+    return make_tuple(name, arg_a, arg_b);
+
+}
+
+// parse strategy tokens
+size_t parse_strategy_tokens(vector<Token> tokens, size_t pos, Strategy& strategy) {
+
+    while (pos < tokens.size() && tokens[pos].value == "STRATEGY") {
+
+        pos++;  // pass keyword
+
+        if (tokens[pos].type != TokenType::NAME) {  // case: format failure
+            cout << "Strategy name format is invalid." << endl;
+            break;
+        }
+        strategy.name = tokens[pos].value;  // strat name
+        pos++;
+
+    }
+
+    return pos;
+
+}
+
+// parse indicator tokens
+auto parse_indicator_tokens(vector<Token> tokens, size_t pos) {
+
+    vector<Indicators> indicators;  // store sub-structs
+
+    while (pos < tokens.size() && tokens[pos].value == "INDICATOR") {
+
+        pos++;  // pass keyword
+
+        if (tokens[pos].type != TokenType::VARIABLE) {  // case: format failure
+            cout << "Indicator variable format is invalid." << endl;
+            break;
+        }
+        string name = tokens[pos].value;  // variable name
+        pos++;
+
+        if (tokens[pos].type != TokenType::ASSIGNMENT) {  // case: format failure
+            cout << "Indicator assignment format is invalid." << endl;
+            break;
+        }
+        pos++;
+
+        if (tokens[pos].type != TokenType::FUNCTION) {  // case: format failure
+            cout << "Indicator function format is invalid." << endl;
+            break;
+        }
+        auto [type, source, period] = breakdown_function_format(tokens[pos].value);  // parse function
+        pos++;
+
+        Indicators indicator(name, type, source, period);
+        indicators.push_back(indicator);
+
+    }
+
+    return make_tuple(pos, indicators);
+
+}
+
+// parse exit rule tokens
+auto parse_exit_tokens(vector<Token> tokens, size_t pos) {
+
+    vector<ExitRules> exit_conditions;  // store sub-structs
+
+    while (pos < tokens.size() && tokens[pos].value == "EXIT") {
+
+        pos++;  // pass keyword
+
+        if (tokens[pos].type != TokenType::COVERAGE) {  // case: format failure
+            cout << "Indicator variable format is invalid." << endl;
+            break;
+        }
+        string coverage = tokens[pos].value;  // coverage
+        pos++;
+
+        // TODO: need to finish up this whole exit rule parse
+        if (tokens[pos].type == TokenType::FUNCTION) {  // case: format failure
+            auto [operation, left_op, right_op] = breakdown_function_format(tokens[pos].value);  // parse function
+            pos++;
+        } else {
+            // TODO: add exit case with function vs operand after coverage
+        }
+
+        ExitRules exit_rule(name, type, source, period);
+        exit_conditions.push_back(exit_rule);
+
+    }
+
+    return make_tuple(pos, exit_conditions);
+
+}
+
 // set parsed token rules to strategy struct members
 void parse_rules(vector<Token> tokens, Strategy& strategy) {  // ref to modify -> not copy
 
-    unordered_map<TokenType, vector<string>> token_values;  // key-pair for token and val
+    size_t pos{};
 
-    for (auto token : tokens) {  // token objects (type, value)
+    while (pos < tokens.size()) {  // token objects (type, value) 
+        if (tokens[pos].type == TokenType::KEYWORD) {
+            if (tokens[pos].value == "STRATEGY") {
+                size_t new_pos = parse_strategy_tokens(tokens, pos, strategy);
+                pos = new_pos;
+                continue;
+            } else if (tokens[pos].value == "INDICATOR") {
+                auto [new_pos, indicators] = parse_indicator_tokens(tokens, pos);
+                strategy.indicators = indicators;
+                pos = new_pos;
+                continue;
+            } else if (tokens[pos].value == "ENTRY") {
+                auto [new_pos, indicators] = parse_indicator_tokens(tokens, pos);
+                strategy.indicators = indicators;
+                pos = new_pos;
+                continue;
+            } else if (tokens[pos].value == "EXIT") {
+                auto [new_pos, exit_conditions] = parse_exit_tokens(tokens, pos);
+                strategy.exit_rules = exit_conditions;
+                pos = new_pos;
+                continue;
+            } else if (tokens[pos].value == "POSITION") {
+                auto [new_pos, indicators] = parse_indicator_tokens(tokens, pos);
+                strategy.indicators = indicators;
+                pos = new_pos;
+                continue;
+            } else {
+                cout << "Cool done." << endl;
+                break;
+            }
+        } else {
+            cout << "End of valid strategy tokens reached." << endl;
+            break;
+        }
 
-        // TODO: not really working, gotta figure out how i am going to take the token value pairs and correlate them to the strategy struct properly
-        token_values[token.type].push_back(token.value);
-        cout << "===================" << endl;
-        for (auto val : token_values[token.type]) {
-            cout << "Val: " << val << endl;
-        }   
     }
 
-        //     if (token.type == TokenType::NAME) {
-    //         strategy.name = token.value;  // name
-    //         cout << "Type: NAME, Value: " << token.value << endl;
-    //     } else if (token.type == TokenType::KEYWORD) {
-    //         if (token.value == "INDICATOR") {
-    //             Indicators indicator;
-    //             indicator()
-    //         } 
-    //         strategy.name = token.value;  // keyword
-    //         cout << "Type: KEYWORD, Value: " << token.value << endl;
-    //     } else if (token.type == TokenType::FUNCTION) {
-    //         strategy.name = token.value;  // function
-    //         cout << "Type: FUNCTION, Value: " << token.value << endl;
-    //     } else if (token.type == TokenType::VARIABLE) {
-    //         strategy.name = token.value;  // variable
-    //         cout << "Type: VARIABLE, Value: " << token.value << endl;
-    //     } else if (token.type == TokenType::INTEGER_LITERAL) {
-    //         strategy.name = token.value;  // int
-    //         cout << "Type: INTEGER_LITERAL, Value: " << token.value << endl;
-    //     } else if (token.type == TokenType::FLOAT_LITERAL) {
-    //         strategy.name = token.value;  // float
-    //         cout << "Type: FLOAT_LITERAL, Value: " << token.value << endl;
-    //     } else if (token.type == TokenType::BOOL_LITERAL) {
-    //         strategy.name = token.value;  // bool
-    //         cout << "Type: BOOL_LITERAL, Value: " << token.value << endl;
-    //     } else if (token.type == TokenType::LOGIC_OPERATOR) {
-    //         strategy.name = token.value;  // logic op
-    //         cout << "Type: LOGIC_OPERATOR, Value: " << token.value << endl;
-    //     } else if (token.type == TokenType::COMPARISON_OPERATOR) {
-    //         strategy.name = token.value;  // comp op
-    //         cout << "Type: COMPARISON_OPERATOR, Value: " << token.value << endl;
-    //     } else if (token.type == TokenType::ARITHMITIC_OPERATOR) {
-    //         strategy.name = token.value;  // math op
-    //         cout << "Type: ARITHMITIC_OPERATOR, Value: " << token.value << endl;
-    //     } else if (token.type == TokenType::COVERAGE) {
-    //         strategy.name = token.value;  // coverage
-    //         cout << "Type: COVERAGE, Value: " << token.value << endl;
-    //     } else if (token.type == TokenType::ASSIGNMENT) {
-    //         strategy.name = token.value;  // assignment
-    //         cout << "Type: ASSIGNMENT, Value: " << token.value << endl;
-    //     } else if (token.type == TokenType::DELIMETER) {
-    //         strategy.name = token.value;  // delim
-    //         cout << "Type: DELIMETER, Value: " << token.value << endl;
-    //     } else {
-    //         cout << "Type: UNKNOWN, Value: " << token.value << endl;  // ignore invalid tokens
-    //     }
 
     // TODO: use these conditionals below to fix above parser ^^^^^
     // } else if (parts[0] == "INDICATOR") {

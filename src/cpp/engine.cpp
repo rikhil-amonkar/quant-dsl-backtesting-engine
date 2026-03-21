@@ -3,6 +3,7 @@
 #include <tuple>
 #include <vector>
 #include <map>
+#include <format>
 #include <fstream>
 #include <sstream>
 #include <algorithm>
@@ -303,14 +304,16 @@ auto breakdown_function_format(string function) {
 
     // get arguments
     string arg_a = args[0];
-    int arg_b = stoi(args[1]);
+    string arg_b = args[1];
 
     return make_tuple(name, arg_a, arg_b);
 
 }
 
 // parse strategy tokens
-size_t parse_strategy_tokens(vector<Token> tokens, size_t pos, Strategy& strategy) {
+auto parse_strategy_tokens(vector<Token> tokens, size_t pos) {
+
+    string strat_name{};
 
     while (pos < tokens.size() && tokens[pos].value == "STRATEGY") {
 
@@ -320,12 +323,12 @@ size_t parse_strategy_tokens(vector<Token> tokens, size_t pos, Strategy& strateg
             cout << "Strategy name format is invalid." << endl;
             break;
         }
-        strategy.name = tokens[pos].value;  // strat name
+        strat_name = tokens[pos].value;  // strat name
         pos++;
 
     }
 
-    return pos;
+    return make_tuple(pos, strat_name);
 
 }
 
@@ -358,7 +361,7 @@ auto parse_indicator_tokens(vector<Token> tokens, size_t pos) {
         auto [type, source, period] = breakdown_function_format(tokens[pos].value);  // parse function
         pos++;
 
-        Indicators indicator(name, type, source, period);
+        Indicators indicator(name, type, source, stoi(period));
         indicators.push_back(indicator);
 
     }
@@ -367,32 +370,119 @@ auto parse_indicator_tokens(vector<Token> tokens, size_t pos) {
 
 }
 
+// parse entry rule tokens
+auto parse_entry_tokens(vector<Token> tokens, size_t pos) {
+  
+    vector<Conditions> conditions;
+    string logic_op{};
+    string direction{};
+
+    while (pos < tokens.size() && tokens[pos].value == "ENTRY") {
+
+        pos++;  // pass keyword
+
+        if (tokens[pos].type != TokenType::COVERAGE) {  // case: format failure
+            cout << "Entry rule coverage format is invalid." << endl;
+            break;
+        }
+        direction = tokens[pos].value;  // variable name
+        pos++;
+
+        //! currently only handles our exact entry rule (cond1 AND comparison)
+        if (
+            tokens[pos].type == TokenType::FUNCTION ||  // func
+            tokens[pos].type == TokenType::VARIABLE ||  // variable
+            tokens[pos].type == TokenType::LOGIC_OPERATOR  // logic op
+        ) {
+            if (tokens[pos].type == TokenType::FUNCTION) {
+                auto [operation, left_op, right_op] = breakdown_function_format(tokens[pos].value);  // parse function
+                Conditions condition(
+                    operation,  // operation
+                    left_op,  // left op
+                    right_op  // right op
+                );
+                conditions.push_back(condition);
+                pos++;
+            } 
+            if (tokens[pos].type == TokenType::LOGIC_OPERATOR) {
+                logic_op = tokens[pos].value;  // AND/OR
+                pos++;
+
+            } 
+            if (tokens[pos].type == TokenType::VARIABLE) {  // variable
+                Conditions condition(
+                    tokens[pos+1].value,  // operation
+                    tokens[pos].value,  // left op
+                    tokens[pos+2].value  // right op
+                );
+                conditions.push_back(condition);
+                pos += 3;  //! fix hardcode forward
+            }
+        } else {
+            cout << "Entry rule condition format is invalid." << endl;
+            break;
+        }
+
+    }
+
+    EntryRule entry_rule(
+        direction,  // direction
+        conditions,  // conditions
+        logic_op  // logic op
+    );
+
+    return make_tuple(pos, entry_rule);
+
+}
+
 // parse exit rule tokens
 auto parse_exit_tokens(vector<Token> tokens, size_t pos) {
 
+    vector<Conditions> conditions;
     vector<ExitRules> exit_conditions;  // store sub-structs
+    string action{};
+    string expression{};  // arithmitic
 
     while (pos < tokens.size() && tokens[pos].value == "EXIT") {
 
         pos++;  // pass keyword
 
         if (tokens[pos].type != TokenType::COVERAGE) {  // case: format failure
-            cout << "Indicator variable format is invalid." << endl;
+            cout << "Indicator coverage format is invalid." << endl;
             break;
         }
-        string coverage = tokens[pos].value;  // coverage
+        action = tokens[pos].value;  // coverage
         pos++;
 
-        // TODO: need to finish up this whole exit rule parse
-        if (tokens[pos].type == TokenType::FUNCTION) {  // case: format failure
+        if (tokens[pos].type == TokenType::FUNCTION) {  // case: simple function
             auto [operation, left_op, right_op] = breakdown_function_format(tokens[pos].value);  // parse function
+            Conditions condition(
+                operation,  // operation
+                left_op,  // left op
+                right_op  // right op
+            );
+            conditions.push_back(condition);
             pos++;
         } else {
-            // TODO: add exit case with function vs operand after coverage
+            //! need to update later for expression in condition, currently hardcoded-ish
+            expression = format(  // concatenate
+                "{} {} {}",  // a * b
+                tokens[pos+3].value,
+                tokens[pos+2].value, 
+                tokens[pos+4].value
+            );
+            Conditions condition(
+                tokens[pos+1].value,  // operation
+                tokens[pos].value,  // left op
+                expression  // right op (a * b)
+            );
+            conditions.push_back(condition);
+            pos += 5;  //! fix hardcode forward
         }
 
-        ExitRules exit_rule(name, type, source, period);
+        ExitRules exit_rule(action, conditions);
         exit_conditions.push_back(exit_rule);
+        conditions.clear();  // clear for next exit rule
 
     }
 
@@ -400,39 +490,105 @@ auto parse_exit_tokens(vector<Token> tokens, size_t pos) {
 
 }
 
-// set parsed token rules to strategy struct members
-void parse_rules(vector<Token> tokens, Strategy& strategy) {  // ref to modify -> not copy
+// parse position tokens
+auto parse_position_tokens(vector<Token> tokens, size_t pos) {
+  
+    vector<string> pos_vars;
 
-    size_t pos{};
+    while (pos < tokens.size() && tokens[pos].value == "POSITION") {
+
+        pos++;  // pass keyword
+
+        if (tokens[pos].type != TokenType::VARIABLE) {  // case: format failure
+            cout << "Position variable format is invalid." << endl;
+            break;
+        }
+        pos++;
+
+        if (tokens[pos].type != TokenType::ASSIGNMENT) {  // case: format failure
+            cout << "Position assignment format is invalid." << endl;
+            break;
+        }
+        pos++;
+
+        if (
+            tokens[pos].type == TokenType::INTEGER_LITERAL ||  // int
+            tokens[pos].type == TokenType::FLOAT_LITERAL ||  // float
+            tokens[pos].type == TokenType::BOOL_LITERAL  // bool
+        ) {
+            pos_vars.push_back(tokens[pos].value);
+            pos++;
+        } else {
+            cout << "Position variable format is invalid." << endl;
+            break;
+        }
+
+    }
+
+    // string to bool
+    bool allow{};
+    if (pos_vars[2] == "false") {
+        allow = false;
+    } else {
+        allow = true;
+    }
+
+    PositionSettings pos_settings(
+        stof(pos_vars[0]),  // size %
+        stoi(pos_vars[1]),  // max pos
+        allow  // allow short
+    );
+
+    return make_tuple(pos, pos_settings);
+
+}
+
+// set parsed token rules to strategy struct members
+Strategy parse_rules(vector<Token> tokens) {  // ref to modify -> not copy
+
+    size_t pos{};  // global
+
+    // default construct to update later
+    string name{};
+    vector<Indicators> indicators{{"", "", "", 0}};
+    EntryRule entry_rule{"", {}, ""};
+    vector<ExitRules> exit_rules{{"", {}}};
+    PositionSettings pos_settings{0.0f, 0, false};
 
     while (pos < tokens.size()) {  // token objects (type, value) 
         if (tokens[pos].type == TokenType::KEYWORD) {
             if (tokens[pos].value == "STRATEGY") {
-                size_t new_pos = parse_strategy_tokens(tokens, pos, strategy);
+                cout << "Working on assigning STRATEGY struct." << endl;
+                auto [new_pos, parsed_name] = parse_strategy_tokens(tokens, pos);
+                name = std::move(parsed_name);  // move resource --> prevent copy
                 pos = new_pos;
                 continue;
             } else if (tokens[pos].value == "INDICATOR") {
-                auto [new_pos, indicators] = parse_indicator_tokens(tokens, pos);
-                strategy.indicators = indicators;
+                cout << "Working on assigning INDICATOR struct." << endl;
+                auto [new_pos, parsed_indicators] = parse_indicator_tokens(tokens, pos);
+                indicators = std::move(parsed_indicators);
                 pos = new_pos;
                 continue;
             } else if (tokens[pos].value == "ENTRY") {
-                auto [new_pos, indicators] = parse_indicator_tokens(tokens, pos);
-                strategy.indicators = indicators;
+                cout << "Working on assigning ENTRY struct." << endl;
+                auto [new_pos, parsed_entry_rule] = parse_entry_tokens(tokens, pos);
+                entry_rule = std::move(parsed_entry_rule);
                 pos = new_pos;
                 continue;
             } else if (tokens[pos].value == "EXIT") {
-                auto [new_pos, exit_conditions] = parse_exit_tokens(tokens, pos);
-                strategy.exit_rules = exit_conditions;
+                cout << "Working on assigning EXIT struct." << endl;
+                auto [new_pos, parsed_exit_conditions] = parse_exit_tokens(tokens, pos);
+                exit_rules = std::move(parsed_exit_conditions);
                 pos = new_pos;
                 continue;
             } else if (tokens[pos].value == "POSITION") {
-                auto [new_pos, indicators] = parse_indicator_tokens(tokens, pos);
-                strategy.indicators = indicators;
+                cout << "Working on assigning POSITION struct." << endl;
+                auto [new_pos, parsed_pos_settings] = parse_position_tokens(tokens, pos);
+                pos_settings = std::move(parsed_pos_settings);
                 pos = new_pos;
                 continue;
             } else {
-                cout << "Cool done." << endl;
+                cout << "All struct members have been created." << endl;
                 break;
             }
         } else {
@@ -442,67 +598,21 @@ void parse_rules(vector<Token> tokens, Strategy& strategy) {  // ref to modify -
 
     }
 
+    // populate strat constructor
+    Strategy strategy(
+        name,
+        indicators,
+        entry_rule,
+        exit_rules,
+        pos_settings
+    );
 
-    // TODO: use these conditionals below to fix above parser ^^^^^
-    // } else if (parts[0] == "INDICATOR") {
-    //     Indicators indicator;  // init
-    //     indicator.name = parts[1];
-    //     indicator.type = parts[2];
-    //     indicator.source = parts[3];
-    //     indicator.period = stoi(parts[4]);  // str to int
-    //     strategy.indicators.push_back(indicator);  // append
-    //     return "INDICATOR " + indicator.name;
-    // } else if (parts[0] == "ENTRY") {
-    //     EntryRule entry_rule;  // init
-    //     Conditions entry_conditions;  // init
-    //     entry_rule.direction = parts[1];
-    //     entry_rule.logic_operator = parts[5];
-    //     entry_conditions.operation = parts[2];
-    //     entry_conditions.left_operand = parts[3];
-    //     entry_conditions.right_operand = parts[4];
-    //     entry_rule.conditions.push_back(entry_conditions);  // append cond1
-    //     entry_conditions.operation = parts[7];
-    //     entry_conditions.left_operand = parts[6];
-    //     entry_conditions.right_operand = parts[8];
-    //     entry_rule.conditions.push_back(entry_conditions);  // append cond2
-    //     strategy.entry_rule = entry_rule;
-    //     return "ENTRY " + entry_rule.direction;
-    // } else if (parts[0] == "EXIT") {
-    //     ExitRules exit_rules;  // init
-    //     Conditions entry_conditions;  // init
-    //     exit_rules.action = parts[1];
-    //     if (parts[2] == "crossover" || parts[2] == "crossunder")  // contains cross op
-    //     {  // case: op, left, right
-    //         entry_conditions.operation = parts[2];
-    //         entry_conditions.left_operand = parts[3];
-    //         entry_conditions.right_operand = parts[4];
-    //     } else {  // case: left, op, right
-    //         entry_conditions.operation = parts[3];
-    //         entry_conditions.left_operand = parts[2];
-    //         entry_conditions.right_operand = parts[4];
-    //     }
-    //     exit_rules.conditions.push_back(entry_conditions);  // append
-    //     strategy.exit_rules.push_back(exit_rules);
-    //     return "EXIT " + exit_rules.action;
-    // } else if (parts[0] == "POSITION") {
-    //     PositionSettings pos_settings;  // init
-    //     pos_settings.size_percentage = stoi(parts[2]);  // str to int
-    //     pos_settings.max_positions = stoi(parts[4]);  // str to int
-    //     if (parts[6] == "true") {
-    //         pos_settings.allow_short = true;
-    //     } else {
-    //         pos_settings.allow_short = false;
-    //     }
-    //     strategy.pos_settings = pos_settings;
-    //     return "POSITION " + parts[2];
-    // } else {
-    //     return "INVALID COMMAND";  // fallback
-    // }
+    return strategy;
 
 }
 
 // read lines from strategy file
-void read_strat(string filename, Strategy& strategy) {  // ref to struct
+Strategy read_strat(string filename) {  // ref to struct
 
     // pull temp backtesting strategy file
     string strat_text;
@@ -515,7 +625,7 @@ void read_strat(string filename, Strategy& strategy) {  // ref to struct
 
     LexicalTokenParser token_parser(full_text);  // parse text
     vector<Token> tokens = token_parser.tokenize();  // tokenize
-    parse_rules(tokens, strategy);  // assign tokens to strategy struct
+    Strategy strategy = parse_rules(tokens);  // assign tokens to strategy struct
 
     cout << "\n============================\n" << endl;
     cout << "PARSED STRATEGY:\n" << endl;
@@ -524,16 +634,17 @@ void read_strat(string filename, Strategy& strategy) {  // ref to struct
 
     strat_file.close();  // for memory space
 
+    return strategy;  // struct with members
+
 }
 
 int main() {
 
     cout << "Backtesting Engine!\n" << endl;
 
-    Strategy strategy;  // init strategy
-
     string filename = "./improved_temp_strat.txt";
-    read_strat(filename, strategy);
+    Strategy strategy = read_strat(filename);  // built strategy struct
+    cout << "Strategy struct's members have been populate with file attributes!\n" << endl;
 
     // store updates indicator values
     map<string, float> current_values;

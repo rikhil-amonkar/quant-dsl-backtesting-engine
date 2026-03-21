@@ -13,7 +13,7 @@ struct Conditions {
     string right_operand;
 
     Conditions(  // conditions constructor
-        string operation, string left_operand, string right_operand
+        string o, string l, string r
     ) : operation(o), left_operand(l), right_operand(r) {};
 };
 
@@ -36,8 +36,8 @@ struct EntryRule {
     string logic_operator;  // AND,OR
 
     EntryRule(  // entry rules constructor
-        string direction, vector<Conditions> conditions, string logic_operator
-    ) : direction(d), conditions(c), logic_operator(l)
+        string d, vector<Conditions> c, string l
+    ) : direction(d), conditions(c), logic_operator(l) {};
 };
 
 // when to exit backtest
@@ -46,7 +46,7 @@ struct ExitRules {
     vector<Conditions> conditions;
 
     ExitRules(  // exit rules constructor
-        string action, vector<Conditions> conditions
+        string a, vector<Conditions> c
     ) : action(a), conditions(c) {};
 };
 
@@ -57,7 +57,7 @@ struct PositionSettings {
     bool allow_short;  // yes/no
 
     PositionSettings(  // position settings constructor
-        float size_percentage, int max_positions, bool allow_short
+        float s, int m, bool a
     ) : size_percentage(s), max_positions(m), allow_short(a) {};
 };
 
@@ -68,6 +68,10 @@ struct Strategy {
     EntryRule entry_rule;  // single rule
     vector<ExitRules> exit_rules;
     PositionSettings pos_settings;  // thresholds
+
+    Strategy(  // strategy constructor
+        string n, vector<Indicators> i, EntryRule en, vector<ExitRules> ex, PositionSettings p
+    ) : name(n), indicators(i), entry_rule(en), exit_rules(ex), pos_settings(p) {};
 };
 
 #endif

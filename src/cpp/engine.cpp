@@ -1,9 +1,7 @@
 #include <iostream>
 #include <string>
-#include <tuple>
 #include <vector>
 #include <map>
-#include <format>
 #include <fstream>
 #include <sstream>
 #include <algorithm>
@@ -39,19 +37,19 @@ map<int, vector<int>> market_data = {  // ordered hashmap
     {15, {94, 96, 90, 92, 2450}},
 };
 
-// check of conditions match parent operator
-bool validate_condition_operator(
-    bool con_a, bool con_b, string logic_op
-) {
+// // check of conditions match parent operator
+// bool validate_condition_operator(
+//     bool con_a, bool con_b, string logic_op
+// ) {
 
-    if (logic_op == "AND") {
-        return con_a && con_b;
-    }
-    else {  // case: OR
-        return con_a || con_b;
-    }
+//     if (logic_op == "AND") {
+//         return con_a && con_b;
+//     }
+//     else {  // case: OR
+//         return con_a || con_b;
+//     }
 
-}
+// }
 
 // get market data index from hashmap layout
 int get_data_index(string source) {
@@ -393,33 +391,38 @@ int main() {
 
         vector<bool> entry_condition_outcomes{};  // store condition true/false
 
-        // check if entry rule is valid
-        for (auto condition : strategy.entry_rule.conditions) {
-            string left_operand = condition.left_operand;
-            string right_operand = condition.right_operand;
-            string operation = condition.operation;  // forms --> (left operator right)
-            bool entry_condition_res = operation_handler(
-                operation, curr_day, left_operand, right_operand, 
-                current_values, previous_values, market_data, bar_fields
-            );
+        // check if all entry rules are valid
+        for (auto entry_rule : strategy.entry_rules) {
+            cout << "Entry rule direction: " + entry_rule.direction << endl;
 
-            cout << "Entry Condition (0,1): " << entry_condition_res << endl;
-            entry_condition_outcomes.push_back(entry_condition_res);  // store bool
+            for (auto condition : entry_rule.conditions) {
+                string left_operand = condition.left_operand;
+                string right_operand = condition.right_operand;
+                string operation = condition.operation;  // forms --> (left operator right)
+                bool entry_condition_res = operation_handler(
+                    operation, curr_day, left_operand, right_operand, 
+                    current_values, previous_values, market_data, bar_fields
+                );
+    
+                cout << "Entry Condition (0,1): " << entry_condition_res << endl;
+                entry_condition_outcomes.push_back(entry_condition_res);  // store bool
+            }
 
-        //! need to improve to handle multiple conditions and operators (currently only 2) -> bad long term
-        // check entry rule conditions with operator
-        if (validate_condition_operator(
-            entry_condition_outcomes[0], 
-            entry_condition_outcomes[1], 
-            strategy.entry_rule.logic_operator  // AND/OR
-        ) && !in_entry_cycle) {  // if not already entered
-            cout << "Day: " << curr_day << " passed the entry rule...entering trade." << endl;
-            pnl_update_val = 0.0;
-            price_exited_at = 0.0;
-            price_entered_at = open_val;  // bar entry
-            in_entry_cycle = true;
-        }
-
+            // all instances of entry rule being true
+            bool entry_true = all_of(  // lambda func
+                entry_condition_outcomes.begin(), 
+                entry_condition_outcomes.end(), 
+                [](bool b){ return b; }  // bool val
+            );  //! currently checks if ALL are true, could add OR in future
+            
+            // check entry rule conditions with operator
+            if (entry_true && !in_entry_cycle) {  // if not already entered
+                cout << "Day: " << curr_day << " passed the entry rule...entering trade." << endl;
+                pnl_update_val = 0.0;
+                price_exited_at = 0.0;
+                price_entered_at = open_val;  // bar entry
+                in_entry_cycle = true;
+            }
         }
 
         // check if currently entered trade
@@ -431,6 +434,7 @@ int main() {
             // check exit conditions incase trade is invalid
             for (auto exit_rule : strategy.exit_rules) {
                 cout << "Exit rule action: " + exit_rule.action << endl;
+
                 for (auto condition : exit_rule.conditions) {                    
                     string left_operand = condition.left_operand;
                     string right_operand = condition.right_operand;
@@ -438,7 +442,7 @@ int main() {
 
                     //! remove hardcoded condition for exit equation --> need to breakdown somehow
                     bool exit_condition_res{};
-                    if (right_operand == "entry_price*0.97") {  // case: sub-equation
+                    if (right_operand == "entry_price * 0.97") {  // case: sub-equation
                         exit_condition_res = operation_handler(
                             operation, curr_day, left_operand, right_operand, 
                             current_values, previous_values, market_data, 
@@ -460,7 +464,7 @@ int main() {
                 exit_condition_outcomes.begin(), 
                 exit_condition_outcomes.end(), 
                 [](bool b){ return b; }  // bool val
-            );
+            );  //! currently checks if ALL are true, could add OR in future
 
             // compute num shares to use in trade
             share_quantity = compute_share_quantity(
@@ -477,7 +481,7 @@ int main() {
                 price_exited_at = close_val;  // bar close
                 realized_pnl = compute_current_pnl(
                     share_quantity, price_entered_at, 
-                    price_exited_at, strategy.entry_rule.direction
+                    price_exited_at, strategy.entry_rules[0].direction  //! fix incase directions not all same
                 );
                 final_pnl += realized_pnl;  // add to final pnl
                 pnl_update_val = 0.0;  // not in trade
@@ -487,7 +491,7 @@ int main() {
                 cout << "Still in trade. Adding unrealized pnl." << endl;
                 unrealized_pnl = compute_current_pnl(
                     share_quantity, price_entered_at, 
-                    close_val, strategy.entry_rule.direction
+                    close_val, strategy.entry_rules[0].direction  //! fix incase directions not all same
                 );
                 pnl_update_val += unrealized_pnl;  // running cycle sum
 

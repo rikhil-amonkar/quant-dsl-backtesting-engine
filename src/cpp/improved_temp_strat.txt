@@ -4,7 +4,8 @@ INDICATOR short_sma = SMA(close, 3)
 INDICATOR long_sma = SMA(close, 5)
 INDICATOR vol_avg = SMA(volume, 3)
 
-ENTRY long crossover(short_sma, long_sma) AND volume > vol_avg
+ENTRY long crossover(short_sma, long_sma)
+ENTRY long volume > vol_avg
 
 EXIT close_position crossunder(short_sma, long_sma)
 EXIT close_position close <= entry_price * 0.97

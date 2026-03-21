@@ -30,12 +30,12 @@ struct Indicators {
 };
 
 // rule to enter backtest
-struct EntryRule {
+struct EntryRules {
     string direction;  // long/short
     vector<Conditions> conditions; 
     string logic_operator;  // AND,OR
 
-    EntryRule(  // entry rules constructor
+    EntryRules(  // entry rules constructor
         string d, vector<Conditions> c, string l
     ) : direction(d), conditions(c), logic_operator(l) {};
 };
@@ -65,13 +65,13 @@ struct PositionSettings {
 struct Strategy {
     string name;  // strat
     vector<Indicators> indicators;  // SMA
-    EntryRule entry_rule;  // single rule
-    vector<ExitRules> exit_rules;
+    vector<EntryRules> entry_rules;  // multiple
+    vector<ExitRules> exit_rules;  // multiple
     PositionSettings pos_settings;  // thresholds
 
     Strategy(  // strategy constructor
-        string n, vector<Indicators> i, EntryRule en, vector<ExitRules> ex, PositionSettings p
-    ) : name(n), indicators(i), entry_rule(en), exit_rules(ex), pos_settings(p) {};
+        string n, vector<Indicators> i, vector<EntryRules> en, vector<ExitRules> ex, PositionSettings p
+    ) : name(n), indicators(i), entry_rules(en), exit_rules(ex), pos_settings(p) {};
 };
 
 #endif

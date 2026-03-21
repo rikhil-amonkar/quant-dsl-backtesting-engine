@@ -39,7 +39,12 @@ private:  // local
             args.push_back(arg);
         }
 
-        return make_tuple(name, args[0], args[1]);
+        string args_b{};
+        if (!args[1].empty() && args[1][0] == ' ') {
+            args_b = args[1].substr(1);  // skip whitespace
+        }
+
+        return make_tuple(name, args[0], args_b);
 
     }
 
@@ -104,9 +109,10 @@ private:  // local
     }
 
     // parse entry rule tokens
-    EntryRule parse_entry_tokens() {
+    vector<EntryRules> parse_entry_tokens() {
     
         vector<Conditions> conditions;
+        vector<EntryRules> entry_rules;  // store sub-structs
         string logic_op{};
         string direction{};
 
@@ -121,50 +127,36 @@ private:  // local
             direction = tokens[position].value;  // variable name
             position++;
 
-            //! currently only handles our exact entry rule (cond1 AND comparison)
-            if (
-                tokens[position].type == TokenType::FUNCTION ||  // func
-                tokens[position].type == TokenType::VARIABLE ||  // variable
-                tokens[position].type == TokenType::LOGIC_OPERATOR  // logic op
-            ) {
-                if (tokens[position].type == TokenType::FUNCTION) {
-                    auto [operation, left_op, right_op] = breakdown_function_format(tokens[position].value);  // parse function
-                    Conditions condition(
-                        operation,  // operation
-                        left_op,  // left op
-                        right_op  // right op
-                    );
-                    conditions.push_back(condition);
-                    position++;
-                } 
-                if (tokens[position].type == TokenType::LOGIC_OPERATOR) {
-                    logic_op = tokens[position].value;  // AND/OR
-                    position++;
-
-                } 
-                if (tokens[position].type == TokenType::VARIABLE) {  // variable
-                    Conditions condition(
-                        tokens[position+1].value,  // operation
-                        tokens[position].value,  // left op
-                        tokens[position+2].value  // right op
-                    );
-                    conditions.push_back(condition);
-                    position += 3;  //! fix hardcode forward
-                }
-            } else {
-                cout << "Entry rule condition format is invalid." << endl;
-                break;
+            //! changed to have entry on multiple lines but needs adjustments
+            if (tokens[position].type == TokenType::FUNCTION) {
+                auto [operation, left_op, right_op] = breakdown_function_format(tokens[position].value);  // parse function
+                Conditions condition(
+                    operation,  // operation
+                    left_op,  // left op
+                    right_op  // right op
+                );
+                conditions.push_back(condition);
+                position++;
+            } else {  // case: comparison (non-func)
+                Conditions condition(
+                    tokens[position+1].value,  // operation
+                    tokens[position].value,  // left op
+                    tokens[position+2].value  // right op
+                );
+                conditions.push_back(condition);
+                position += 3;  //! fix hardcode forward
             }
+
+            EntryRules entry_rule(
+                direction,  // direction
+                conditions,  // conditions
+                logic_op  // logic op
+            );
+            entry_rules.push_back(entry_rule);
 
         }
 
-        EntryRule entry_rule(
-            direction,  // direction
-            conditions,  // conditions
-            logic_op  // logic op
-        );
-
-        return entry_rule;
+        return entry_rules;
 
     }
 
@@ -172,7 +164,7 @@ private:  // local
     vector<ExitRules> parse_exit_tokens() {
 
         vector<Conditions> conditions;
-        vector<ExitRules> exit_conditions;  // store sub-structs
+        vector<ExitRules> exit_rules;  // store sub-structs
         string action{};
         string expression{};  // arithmitic
 
@@ -200,9 +192,9 @@ private:  // local
                 //! need to update later for expression in condition, currently hardcoded-ish
                 expression = format(  // concatenate
                     "{} {} {}",  // a * b
-                    tokens[position+3].value,
-                    tokens[position+2].value, 
-                    tokens[position+4].value
+                    tokens[position+2].value,  // left op
+                    tokens[position+3].value,  // operation
+                    tokens[position+4].value  // right op
                 );
                 Conditions condition(
                     tokens[position+1].value,  // operation
@@ -214,12 +206,12 @@ private:  // local
             }
 
             ExitRules exit_rule(action, conditions);
-            exit_conditions.push_back(exit_rule);
+            exit_rules.push_back(exit_rule);
             conditions.clear();  // clear for next exit rule
 
         }
 
-        return exit_conditions;
+        return exit_rules;
 
     }
 
@@ -286,7 +278,7 @@ public:  // callable outside
         // default construct to update later
         string name{};
         vector<Indicators> indicators{{"", "", "", 0}};
-        EntryRule entry_rule{"", {}, ""};
+        vector<EntryRules> entry_rules{{"", {}, ""}};
         vector<ExitRules> exit_rules{{"", {}}};
         PositionSettings pos_settings{0.0f, 0, false};
 
@@ -302,7 +294,7 @@ public:  // callable outside
                     indicators = parse_indicator_tokens();
                 } else if (tokens[position].value == "ENTRY") {
                     cout << "Working on assigning ENTRY struct." << endl;
-                    entry_rule = parse_entry_tokens();
+                    entry_rules = parse_entry_tokens();
                 } else if (tokens[position].value == "EXIT") {
                     cout << "Working on assigning EXIT struct." << endl;
                     exit_rules = parse_exit_tokens();
@@ -325,7 +317,7 @@ public:  // callable outside
         Strategy strategy(
             name,
             indicators,
-            entry_rule,
+            entry_rules,
             exit_rules,
             pos_settings
         );

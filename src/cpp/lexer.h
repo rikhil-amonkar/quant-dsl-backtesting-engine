@@ -1,5 +1,5 @@
-#ifndef TOKENIZE_TEXT_H
-#define TOKENIZE_TEXT_H
+#ifndef LEXER_TEXT_H
+#define LEXER_TEXT_H
 
 #include <iostream>
 #include <string>
@@ -40,7 +40,7 @@ struct Token {
 };
 
 // lexical parser for tokenization
-class LexicalTokenParser {
+class LexicalTokenizer {
 
 private:  // local
 
@@ -216,7 +216,7 @@ private:  // local
 
 public:  // callable outside
 
-    LexicalTokenParser(const string& text) : input(text), position(0) {   // constructor
+    LexicalTokenizer(const string& text) : input(text), position(0) {   // constructor
         init_keywords();  // create hashmap
     }
 
@@ -343,28 +343,5 @@ public:  // callable outside
     }
 
 };
-
-// TODO: remove whenever --> new main in engine
-// int main() {
-
-//     string text;
-//     ifstream strategy("./improved_temp_strat.txt");  // stream text
-//     string full_text{};
-    
-//     while (getline(strategy, text)) {
-//         full_text += text + "\n";  // one large string
-//     }
-
-//     cout << "Parsed Strategy:\n" << endl;
-//     cout << full_text << endl;
-//     cout << "============================\n" << endl;
-
-//     LexicalTokenParser token_parser(full_text);  // parse
-
-//     vector<Token> tokens = token_parser.tokenize();  // tokenize
-
-//     return 0;
-
-// }
 
 #endif

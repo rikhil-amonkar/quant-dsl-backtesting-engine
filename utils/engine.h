@@ -49,17 +49,49 @@ private:  // local
 
     }
 
+    // calculate result value from arithmitic string expression
+    float solve_string_arithmitic(string arithmitic_operation, float value) {
+
+        string text;
+        stringstream stream(arithmitic_operation);
+        vector<string> operands;
+
+        while (stream >> text) {
+            operands.push_back(text);
+        }
+
+        if (operands.size() != 3) {
+            cout << "Not a simple arithmitic. Invalid." << endl;
+            return 0.0f;
+        };
+
+        // solve based on operation type
+        float result{};
+        if (operands[1] == "+") {
+            result = value + stoi(operands[2]);
+        } else if (operands[1] == "-") {
+            result = value - stoi(operands[2]);
+        } else if (operands[1] == "*") {
+            result = value * stoi(operands[2]);
+        } else if (operands[1] == "/") {
+            result = value / stoi(operands[2]);
+        } else {
+            cout << "Invalid arithmitic operator." << endl;
+            return 0.0f;
+        }
+
+        return result;
+
+    }
+
     // compute operand values from condition parts
-    float evaluate_condition_vals(int curr_day, string operand, map<string, 
-        float> current_values, optional<float> entry_price = nullopt  //! fix later (hardcoded)
-    ) {
+    float evaluate_condition_vals(int curr_day, string operand, map<string, float> current_values, float entry_price) {
 
         auto search_it = find(begin(bar_fields), end(bar_fields), operand);  // search for operand
         
         // TODO: be able to handle equations too
-        //! remove hardcoded condition for exit equation --> need to breakdown somehow
-        if (entry_price.has_value()) {  // case: sub-equation
-            return entry_price.value() * 0.97;  //! hardcoded part
+        if (operand.find("entry_price") != string::npos) {  // case: sub-equation
+            return solve_string_arithmitic(operand, entry_price);  //! temp solution (handles arithmitic)
         } else if (search_it != end(bar_fields)) {  // case: in bar fields
             int source_index = get_data_index(operand);  // get op index from data
             return market_data[curr_day][source_index];
@@ -71,15 +103,15 @@ private:  // local
 
     // check if condition expression is true/false (crossover/crossunder)
     bool cross_condition_operation(
-        float left_op_val, float right_op_val, string operation, int curr_day, 
-        string left_operand, string right_operand, map<string, float> previous_values
+        float left_op_val, float right_op_val, string operation, int curr_day, string left_operand, 
+        string right_operand, map<string, float> previous_values, float entry_price
     ) {
 
         int prev_day = curr_day - 1;  // previous day
 
         // using previous day --> "current values" equiv
-        float prev_left_val = evaluate_condition_vals(prev_day, left_operand, previous_values);  // prev day left op val
-        float prev_right_val = evaluate_condition_vals(prev_day, right_operand, previous_values);  // prev day right op val
+        float prev_left_val = evaluate_condition_vals(prev_day, left_operand, previous_values, entry_price);  // prev day left op val
+        float prev_right_val = evaluate_condition_vals(prev_day, right_operand, previous_values, entry_price);  // prev day right op val
 
         // validate comparison ops
         if (operation == "crossunder") {  // crossover --> left <= right prev, left > right curr
@@ -161,17 +193,12 @@ private:  // local
 
     // handle operation function calls (consolidate)
     bool operation_handler(
-        string operation, int curr_day, string left_operand, string right_operand, map<string, float> current_values,
-        map<string, float> previous_values, optional<float> entry_price = nullopt  //! fix later (hardcoded)
+        string operation, int curr_day, string left_operand, string right_operand, map<string, 
+        float> current_values, map<string, float> previous_values, float entry_price
     ) {
 
-        float right_val{};
-        float left_val = evaluate_condition_vals(curr_day, left_operand, current_values);  // left op val
-        if (entry_price.has_value()) {  //! special case --> fix later hardcoded
-            right_val = evaluate_condition_vals(curr_day, right_operand, current_values, entry_price);  // entry price (opt)
-        } else {
-            right_val = evaluate_condition_vals(curr_day, right_operand, current_values);  // right op val
-        }
+        float left_val = evaluate_condition_vals(curr_day, left_operand, current_values, entry_price);  // left op val
+        float right_val = evaluate_condition_vals(curr_day, right_operand, current_values, entry_price);  // right op val     
 
         bool condition_res{};
         if (operation == "crossover" || operation == "crossunder") {  // case: cross ops
@@ -179,7 +206,7 @@ private:  // local
             condition_res = cross_condition_operation(
                 left_val, right_val, operation,
                 curr_day, left_operand, right_operand, 
-                previous_values
+                previous_values, entry_price
             );
         } else {  // case: (>, <, >=, <=) --> not cross ops
             cout << "Rule (Basic): " + to_string(left_val) + " " + operation + " " + to_string(right_val) << endl;
@@ -302,16 +329,16 @@ public:  // callable outside
             // check if all entry rules are valid
             vector<bool> entry_condition_outcomes{};  // store condition true/false
             for (auto entry_rule : strategy.entry_rules) {
-
-                cout << "Entry rule direction: " + entry_rule.direction << endl;
-
                 for (auto condition : entry_rule.conditions) {
+
+                    // divide condition components
                     string left_operand = condition.left_operand;
                     string right_operand = condition.right_operand;
                     string operation = condition.operation;  // forms --> (left operator right)
+
                     bool entry_condition_res = operation_handler(
                         operation, curr_day, left_operand, right_operand, 
-                        current_values, previous_values
+                        current_values, previous_values, price_entered_at
                     );
                     cout << "Entry Condition (0,1): " << entry_condition_res << endl;
                     entry_condition_outcomes.push_back(entry_condition_res);  // store bool
@@ -346,28 +373,18 @@ public:  // callable outside
                 // check exit conditions incase trade is invalid
                 vector<bool> exit_condition_outcomes{};  // store condition true/false
                 for (auto exit_rule : strategy.exit_rules) {
-
-                    cout << "Exit rule action: " + exit_rule.action << endl;
-
                     for (auto condition : exit_rule.conditions) {                    
+
+                        // divide condition components
                         string left_operand = condition.left_operand;
                         string right_operand = condition.right_operand;
                         string operation = condition.operation;  // forms --> (left operator right)
 
-                        //! remove hardcoded condition for exit equation --> need to breakdown somehow
-                        bool exit_condition_res{};
-                        if (right_operand == "entry_price * 0.97") {  // case: sub-equation
-                            exit_condition_res = operation_handler(
-                                operation, curr_day, left_operand, right_operand, 
-                                current_values, previous_values, 
-                                price_entered_at  // optional entry price
-                            );
-                        } else {
-                            exit_condition_res = operation_handler(
-                                operation, curr_day, left_operand, right_operand, 
-                                current_values, previous_values
-                            );
-                        }
+                        //! need to breakdown equation sub-conditions (such as * 0.97 case)
+                        bool exit_condition_res = operation_handler(
+                            operation, curr_day, left_operand, right_operand, 
+                            current_values, previous_values, price_entered_at
+                        );
                         cout << "Exit Condition (0,1): " << exit_condition_res << endl;
                         exit_condition_outcomes.push_back(exit_condition_res);  // store bool
                     }

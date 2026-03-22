@@ -14,7 +14,7 @@ using namespace std;
 // run command: g++ -std=c++20 main.cpp -o main.out && ./main.out
 
 // read lines from strategy file
-Strategy read_strat(string filename) {  // ref to struct
+Strategy read_strategy_file(string filename) {  // ref to struct
 
     // pull temp backtesting strategy file
     string strat_text;
@@ -38,7 +38,7 @@ Strategy read_strat(string filename) {  // ref to struct
 
     strat_file.close();  // for memory space
 
-    return strategy;  // struct with members
+    return strategy;  // populated structs
 
 }
 
@@ -46,14 +46,12 @@ int main() {
 
     cout << "Backtesting Engine!\n" << endl;
 
-    string filename = "./backtesting_strategy.txt";
-    Strategy strategy = read_strat(filename);  // built strategy struct
+    string filename = "./backtesting_strategy.strat";
+    Strategy strategy = read_strategy_file(filename);  // built strategy struct
 
     cout << "Strategy struct's members have been populate with file attributes!\n" << endl;
 
-    // portfolio info
-    float capital = 100000.0f;  // initial $$$
-
+    float capital = 100000.0f;  // initial portfolio capital
     BacktestingEngine engine(market_data, bar_fields, capital, strategy);  // main engine
     auto [final_pnl, updated_capital, capital_diff_percent] = engine.run_data_through_engine_logic();  // simulate pnl
 

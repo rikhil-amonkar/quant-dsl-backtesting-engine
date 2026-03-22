@@ -1,5 +1,5 @@
-#ifndef PARSER_TEXT_H
-#define PARSER_TEXT_H
+#ifndef TOKEN_PARSER_H
+#define TOKEN_PARSER_H
 
 #include <iostream>
 #include <string>
@@ -9,7 +9,7 @@
 #include <sstream>
 #include <algorithm>
 
-#include "structs.h"
+#include "./structs.h"
 
 using namespace std;
 

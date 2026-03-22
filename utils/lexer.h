@@ -1,5 +1,5 @@
-#ifndef LEXER_TEXT_H
-#define LEXER_TEXT_H
+#ifndef TEXT_LEXER_H
+#define TEXT_LEXER_H
 
 #include <iostream>
 #include <string>
@@ -9,7 +9,7 @@
 #include <fstream>
 #include <sstream>
 
-#include "structs.h"
+#include "./structs.h"
 
 using namespace std;
 

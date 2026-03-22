@@ -37,20 +37,6 @@ map<int, vector<int>> market_data = {  // ordered hashmap
     {15, {94, 96, 90, 92, 2450}},
 };
 
-// // check of conditions match parent operator
-// bool validate_condition_operator(
-//     bool con_a, bool con_b, string logic_op
-// ) {
-
-//     if (logic_op == "AND") {
-//         return con_a && con_b;
-//     }
-//     else {  // case: OR
-//         return con_a || con_b;
-//     }
-
-// }
-
 // get market data index from hashmap layout
 int get_data_index(string source) {
 
@@ -226,7 +212,6 @@ bool operation_handler(
     }
 
     bool condition_res{};
-    // cout << "operation: " << operation << endl;
     if (operation == "crossover" || operation == "crossunder") {  // case: cross ops
         cout << "Rule (Cross): " + operation << endl;
         condition_res = cross_condition_operation(
@@ -326,18 +311,20 @@ int main() {
     float value{};
     int min_start_day{};  // start to 0
 
-    bool in_entry_cycle = false;
+    bool in_entry_cycle = false;  // trade state
+
     float pnl_update_val{};  // track entry session
     float final_pnl{};  // final profit/loss
 
-    float unrealized_pnl{};  // exit
-    float realized_pnl{};  // in trade
+    float unrealized_pnl{};  // if were to exit
+    float realized_pnl{};  // after official exit
 
+    // track entry/exit prices for pnl
     float price_entered_at{};
     float price_exited_at{};
 
     // portfolio info
-    float capital = 100000.0f;  // $$$
+    float capital = 100000.0f;  // initial $$$
     float share_quantity{};
     cout << "Initial Capital: $" << capital << endl;
 
@@ -373,6 +360,7 @@ int main() {
         " | Close: " << close_val << 
         " | Volume: " << total_volume << 
         endl; 
+        cout << "----------------------------" << endl;
 
         // skip until valid day for indicator compute
         if (curr_day < min_start_day) {
@@ -506,7 +494,8 @@ int main() {
     float remaining_capital = capital + final_pnl;
     float capital_diff_percent = compute_pnl_percentage_diff(remaining_capital, capital);  // % pnl
 
-    cout << "\nFinal PnL: $" << final_pnl << endl;
+    cout << "\n============================" << endl;
+    cout << "\nFinal Realized PnL: $" << final_pnl << endl;  // realized --> after exit
     cout << "Remaining Capital: $" << remaining_capital << endl;
 
     if (remaining_capital < capital) {  // case: loss

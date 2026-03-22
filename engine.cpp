@@ -19,22 +19,28 @@ using namespace std;
 
 //! IMPROVE: temp data --> replace with webscraped data later
 // temp market data : day, [open, high, low, close, volume]
+// data narrative: dull start -> mid-sample run-up -> volume spike -> fade lower again
 map<int, vector<int>> market_data = {  // ordered hashmap
-    {1, {100, 103, 99, 102, 1000}},
-    {2, {102, 104, 101, 103, 1100}},
-    {3, {103, 105, 102, 104, 1200}},
-    {4, {104, 106, 103, 105, 1500}},
-    {5, {105, 107, 104, 106, 1800}},
-    {6, {106, 108, 105, 107, 1600}},
-    {7, {107, 108, 104, 105, 2000}},
-    {8, {105, 106, 101, 102, 2200}},
-    {9, {102, 103, 98, 99, 2500}},
-    {10, {99, 101, 95, 97, 2800}},
-    {11, {98, 100, 94, 96, 2700}},
-    {12, {97, 99, 93, 95, 2600}},
-    {13, {96, 98, 92, 94, 2550}},
-    {14, {95, 97, 91, 93, 2500}},
-    {15, {94, 96, 90, 92, 2450}},
+    {1, {100, 102, 99, 101, 900}},
+    {2, {101, 103, 100, 101, 880}},
+    {3, {101, 102, 99, 100, 850}},
+    {4, {100, 102, 99, 100, 900}},
+    {5, {100, 101, 98, 99, 920}},
+    {6, {99, 101, 98, 100, 950}},
+    {7, {100, 105, 99, 104, 1200}},
+    {8, {104, 109, 103, 108, 1500}},
+    {9, {108, 114, 107, 113, 1800}},
+    {10, {113, 120, 112, 119, 2100}},
+    {11, {119, 128, 118, 127, 2500}},
+    {12, {127, 136, 125, 134, 2800}},
+    {13, {134, 142, 132, 140, 3000}},
+    {14, {140, 148, 138, 145, 3400}},
+    {15, {145, 146, 132, 135, 2600}},
+    {16, {135, 136, 126, 128, 2200}},
+    {17, {128, 130, 120, 122, 2000}},
+    {18, {122, 124, 115, 117, 1800}},
+    {19, {117, 118, 110, 112, 1700}},
+    {20, {112, 113, 104, 106, 1600}},
 };
 
 // get market data index from hashmap layout
@@ -255,7 +261,7 @@ float compute_current_pnl(
     cout << "Entry Price: " << entry_price << endl;
     cout << "Exit Price: " << exit_price << endl;
     cout << "Shares: " << share_quantity << endl;
-    cout << "Current PnL: $" << current_pnl << endl;
+    cout << "Current Unrealized PnL: $" << current_pnl << endl;
     return current_pnl;
 
 }
@@ -263,7 +269,7 @@ float compute_current_pnl(
 // compute percent difference in pnl from initial capital
 float compute_pnl_percentage_diff(float remaining_capital, float capital) {
 
-    float price_diff = capital - remaining_capital;
+    float price_diff = abs(capital - remaining_capital);
     return (price_diff / capital) * 100;  // 1-100% scale
 
 }
@@ -301,8 +307,9 @@ int main() {
 
     cout << "Backtesting Engine!\n" << endl;
 
-    string filename = "./improved_temp_strat.txt";
+    string filename = "./backtesting_strategy.txt";
     Strategy strategy = read_strat(filename);  // built strategy struct
+
     cout << "Strategy struct's members have been populate with file attributes!\n" << endl;
 
     // store updates indicator values
@@ -310,12 +317,9 @@ int main() {
     map<string, float> previous_values;
     float value{};
     int min_start_day{};  // start to 0
-
     bool in_entry_cycle = false;  // trade state
-
     float pnl_update_val{};  // track entry session
     float final_pnl{};  // final profit/loss
-
     float unrealized_pnl{};  // if were to exit
     float realized_pnl{};  // after official exit
 
@@ -326,6 +330,7 @@ int main() {
     // portfolio info
     float capital = 100000.0f;  // initial $$$
     float share_quantity{};
+
     cout << "Initial Capital: $" << capital << endl;
 
     // immutable array to define possible bar fields
@@ -360,6 +365,7 @@ int main() {
         " | Close: " << close_val << 
         " | Volume: " << total_volume << 
         endl; 
+
         cout << "----------------------------" << endl;
 
         // skip until valid day for indicator compute
@@ -373,14 +379,14 @@ int main() {
             value = compute_indicator(
                 market_data, curr_day, indicator.type, indicator.source, indicator.period
             );
-            current_values[indicator.name] = value;  // store
+            current_values[indicator.name] = value;  // store value variables
             cout << "Indicator " + indicator.name + ": " + to_string(value) << endl;
         }
 
-        vector<bool> entry_condition_outcomes{};  // store condition true/false
-
         // check if all entry rules are valid
+        vector<bool> entry_condition_outcomes{};  // store condition true/false
         for (auto entry_rule : strategy.entry_rules) {
+
             cout << "Entry rule direction: " + entry_rule.direction << endl;
 
             for (auto condition : entry_rule.conditions) {
@@ -391,36 +397,40 @@ int main() {
                     operation, curr_day, left_operand, right_operand, 
                     current_values, previous_values, market_data, bar_fields
                 );
-    
                 cout << "Entry Condition (0,1): " << entry_condition_res << endl;
                 entry_condition_outcomes.push_back(entry_condition_res);  // store bool
             }
-
-            // all instances of entry rule being true
-            bool entry_true = all_of(  // lambda func
-                entry_condition_outcomes.begin(), 
-                entry_condition_outcomes.end(), 
-                [](bool b){ return b; }  // bool val
-            );  //! currently checks if ALL are true, could add OR in future
-            
-            // check entry rule conditions with operator
-            if (entry_true && !in_entry_cycle) {  // if not already entered
-                cout << "Day: " << curr_day << " passed the entry rule...entering trade." << endl;
-                pnl_update_val = 0.0;
-                price_exited_at = 0.0;
-                price_entered_at = open_val;  // bar entry
-                in_entry_cycle = true;
-            }
         }
 
-        // check if currently entered trade
+        // all instances of entry rule being true
+        bool entry_true = all_of(  // lambda func
+            entry_condition_outcomes.begin(), 
+            entry_condition_outcomes.end(), 
+            [](bool b){ return b; }  // bool val
+        );  //! currently checks if ALL are true, could add OR in future
+        
+        // check entry rule conditions with operator
+        if (entry_true && !in_entry_cycle) {  // if not already entered
+
+            cout << "Day: " << curr_day << " passed the entry rule...entering trade." << endl;
+
+            // update trade entry variables
+            pnl_update_val = 0.0;
+            price_exited_at = 0.0;
+            price_entered_at = open_val;  // bar entry
+            in_entry_cycle = true;
+
+        }
+
+        // state for entry in trade
         if (in_entry_cycle) {
+
             cout << "Inside of an entry cycle trade..." << endl;
 
-            vector<bool> exit_condition_outcomes{};  // store condition true/false
-
             // check exit conditions incase trade is invalid
+            vector<bool> exit_condition_outcomes{};  // store condition true/false
             for (auto exit_rule : strategy.exit_rules) {
+
                 cout << "Exit rule action: " + exit_rule.action << endl;
 
                 for (auto condition : exit_rule.conditions) {                    
@@ -461,22 +471,29 @@ int main() {
 
             // state conditionals during entry
             if (curr_day == last_day_in_data) {  // case: hit last day (while still in trade)
+
                 cout << "End of search days reached while still in trade." << endl;
                 final_pnl += pnl_update_val;  // add to final pnl
-            }
-            else if (exit_true) {  // case: exit rule hit
+
+            } else if (exit_true) {  // case: exit rule hit
+
                 cout << "Exit rule has been hit while in trade." << endl;
+
                 price_exited_at = close_val;  // bar close
                 realized_pnl = compute_current_pnl(
                     share_quantity, price_entered_at, 
                     price_exited_at, strategy.entry_rules[0].direction  //! fix incase directions not all same
                 );
+
                 final_pnl += realized_pnl;  // add to final pnl
                 pnl_update_val = 0.0;  // not in trade
                 price_entered_at = 0.0;
                 in_entry_cycle = false;  // exit cycle
+
             } else {  // case: continue
+
                 cout << "Still in trade. Adding unrealized pnl." << endl;
+
                 unrealized_pnl = compute_current_pnl(
                     share_quantity, price_entered_at, 
                     close_val, strategy.entry_rules[0].direction  //! fix incase directions not all same
@@ -491,17 +508,20 @@ int main() {
 
     }
 
-    float remaining_capital = capital + final_pnl;
-    float capital_diff_percent = compute_pnl_percentage_diff(remaining_capital, capital);  // % pnl
+    // update capital based on results
+    float updated_capital = capital + final_pnl;
+    float capital_diff_percent = compute_pnl_percentage_diff(updated_capital, capital);  // % pnl
 
     cout << "\n============================" << endl;
     cout << "\nFinal Realized PnL: $" << final_pnl << endl;  // realized --> after exit
-    cout << "Remaining Capital: $" << remaining_capital << endl;
+    cout << "Updated Capital: $" << updated_capital << endl;
 
-    if (remaining_capital < capital) {  // case: loss
+    if (updated_capital < capital) {  // case: loss
         cout << "Percent Difference in Capital: (-" << capital_diff_percent << "%)" << endl;
-    } else {  // case: gain
+    } else if (updated_capital > capital) {  // case: gain 
         cout << "Percent Difference in Capital: (+" << capital_diff_percent << "%)" << endl;
+    } else {  // case: constant
+        cout << "Percent Difference in Capital: (" << capital_diff_percent << "%)" << endl;
     }
 
     return 0;

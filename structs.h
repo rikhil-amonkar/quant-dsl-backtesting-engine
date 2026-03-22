@@ -74,4 +74,32 @@ struct Strategy {
     ) : name(n), indicators(i), entry_rules(en), exit_rules(ex), pos_settings(p) {};
 };
 
+// define token types
+enum class TokenType {  // enum --> type saftey
+    KEYWORD,  // INDICATOR, EXIT
+    NAME,  // sma_crossover_with_volume
+    ASSIGNMENT,  // =
+    FUNCTION,  // SMA(close, 3)
+    VARIABLE,  // short_sma, long_sma
+    INTEGER_LITERAL,  // 1, 2, 3
+    FLOAT_LITERAL,  // 0.0, 1.0
+    BOOL_LITERAL,  // true, false
+    DELIMETER,  // ()
+    LOGIC_OPERATOR,  // AND, OR
+    ARITHMITIC_OPERATOR,  // +, -, *, /
+    COMPARISON_OPERATOR,  // <, >
+    COVERAGE,  // long, close_position
+    UNKNOWN  // invalid
+};
+
+// token definition
+struct Token {
+    TokenType type;
+    string value;
+
+    Token(  // token constructor
+        TokenType t, const string& v
+    ) : type(t), value(v) {};
+};
+
 #endif

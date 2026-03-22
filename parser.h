@@ -153,6 +153,7 @@ private:  // local
                 logic_op  // logic op
             );
             entry_rules.push_back(entry_rule);
+            conditions.clear();  // clear for next entry rule
 
         }
 

@@ -66,21 +66,18 @@ private:  // local
         };
 
         // solve based on operation type
-        float result{};
         if (operands[1] == "+") {
-            result = value + stoi(operands[2]);
+            return (value + stof(operands[2]));
         } else if (operands[1] == "-") {
-            result = value - stoi(operands[2]);
+            return (value - stof(operands[2]));
         } else if (operands[1] == "*") {
-            result = value * stoi(operands[2]);
+            return (value * stof(operands[2]));
         } else if (operands[1] == "/") {
-            result = value / stoi(operands[2]);
+            return (value / stof(operands[2]));
         } else {
             cout << "Invalid arithmitic operator." << endl;
             return 0.0f;
         }
-
-        return result;
 
     }
 
@@ -275,6 +272,8 @@ public:  // callable outside
         // track entry/exit prices for pnl
         float price_entered_at{};
         float price_exited_at{};
+        bool pending_entry{};
+        bool pending_exit{};
 
         // portfolio info
         float share_quantity{};
@@ -319,54 +318,102 @@ public:  // callable outside
                 continue;
             }
 
+            // enter at the open value of day after
+            if (pending_entry) {  // open trade
+
+                price_entered_at = open_val;  // entry price
+
+                // compute num shares to use in trade
+                share_quantity = compute_share_quantity(price_entered_at, strategy.pos_settings.size_percentage);
+                
+                // update states
+                in_entry_cycle = true;
+                pending_entry = false;
+
+            }
+
+            // exit at the open value of day after
+            if (pending_exit) {  // close trade
+
+                cout << "Exiting trade..." << endl;
+                price_exited_at = open_val;  // exit price
+
+                // compute num shares to use in trade
+                share_quantity = compute_share_quantity(price_entered_at, strategy.pos_settings.size_percentage);
+
+                // update exited pnl
+                realized_pnl = compute_current_pnl(
+                    share_quantity, price_entered_at, 
+                    price_exited_at, strategy.entry_rules[0].direction  //! fix incase directions not all same
+                );
+
+                final_pnl += realized_pnl;  // add to final pnl
+
+                // reset values
+                pnl_update_val = 0.0;  // not in trade
+                price_entered_at = 0.0;
+
+                // update states
+                in_entry_cycle = false;
+                pending_exit = false;
+                cout << "----------------------------" << endl;
+
+            }
+
             // compute indicator values per indicator type
             for (auto indicator : strategy.indicators) {
                 value = compute_indicator(curr_day, indicator.type, indicator.source, indicator.period);
                 current_values[indicator.name] = value;  // store value variables
                 cout << "Indicator " + indicator.name + ": " + to_string(value) << endl;
             }
+            cout << "----------------------------" << endl;
 
-            // check if all entry rules are valid
-            vector<bool> entry_condition_outcomes{};  // store condition true/false
-            for (auto entry_rule : strategy.entry_rules) {
-                for (auto condition : entry_rule.conditions) {
+            // check entry conditions (when not in trade)
+            if (!in_entry_cycle) {
 
-                    // divide condition components
-                    string left_operand = condition.left_operand;
-                    string right_operand = condition.right_operand;
-                    string operation = condition.operation;  // forms --> (left operator right)
+                // check if all entry rules are valid
+                vector<bool> entry_condition_outcomes{};  // store condition true/false
+                for (auto entry_rule : strategy.entry_rules) {
+                    for (auto condition : entry_rule.conditions) {
 
-                    bool entry_condition_res = operation_handler(
-                        operation, curr_day, left_operand, right_operand, 
-                        current_values, previous_values, price_entered_at
-                    );
-                    cout << "Entry Condition (0,1): " << entry_condition_res << endl;
-                    entry_condition_outcomes.push_back(entry_condition_res);  // store bool
+                        // divide condition components
+                        string left_operand = condition.left_operand;
+                        string right_operand = condition.right_operand;
+                        string operation = condition.operation;  // forms --> (left operator right)
+
+                        bool entry_condition_res = operation_handler(
+                            operation, curr_day, left_operand, right_operand, 
+                            current_values, previous_values, price_entered_at
+                        );
+                        cout << "Entry Condition (0,1): " << entry_condition_res << endl;
+                        entry_condition_outcomes.push_back(entry_condition_res);  // store bool
+                    }
                 }
-            }
 
-            // all instances of entry rule being true
-            bool entry_true = all_of(  // lambda func
-                entry_condition_outcomes.begin(), 
-                entry_condition_outcomes.end(), 
-                [](bool b){ return b; }  // bool val
-            );  //! currently checks if ALL are true, could add OR in future
+                // all instances of entry rule being true
+                bool entry_true = all_of(  // lambda func
+                    entry_condition_outcomes.begin(), 
+                    entry_condition_outcomes.end(), 
+                    [](bool b){ return b; }  // bool val
+                );  //! currently checks if ALL are true, could add OR in future
             
-            // check entry rule conditions with operator
-            if (entry_true && !in_entry_cycle) {  // if not already entered
+                // check entry rule conditions with operator
+                if (entry_true) {
 
-                cout << "Day: " << curr_day << " passed the entry rule...entering trade." << endl;
+                    cout << "Day: " << curr_day << " passed the entry rule...entering trade." << endl;
 
-                // update trade entry variables
-                pnl_update_val = 0.0;
-                price_exited_at = 0.0;
-                price_entered_at = open_val;  // bar entry
-                in_entry_cycle = true;
+                    // update trade entry variables
+                    pnl_update_val = 0.0;
+                    price_exited_at = 0.0;
+                    pending_entry = true;  // enter next day
 
-            }
+                    // update previous day values
+                    previous_values = current_values;  // after using
+                    continue;  // skip to next day
+                
+                }
 
-            // state for entry in trade
-            if (in_entry_cycle) {
+            } else {  // case: when already in a trade
 
                 cout << "Inside of an entry cycle trade..." << endl;
 
@@ -397,11 +444,6 @@ public:  // callable outside
                     [](bool b){ return b; }  // bool val
                 );  //! currently checks if ALL are true, could add OR in future
 
-                // compute num shares to use in trade
-                share_quantity = compute_share_quantity(
-                    price_entered_at, strategy.pos_settings.size_percentage
-                );
-
                 // state conditionals during entry
                 if (curr_day == last_day_in_data) {  // case: hit last day (while still in trade)
 
@@ -411,33 +453,52 @@ public:  // callable outside
                 } else if (exit_true) {  // case: exit rule hit
 
                     cout << "Exit rule has been hit while in trade." << endl;
-
-                    price_exited_at = close_val;  // bar close
-                    realized_pnl = compute_current_pnl(
-                        share_quantity, price_entered_at, 
-                        price_exited_at, strategy.entry_rules[0].direction  //! fix incase directions not all same
-                    );
-
-                    final_pnl += realized_pnl;  // add to final pnl
-                    pnl_update_val = 0.0;  // not in trade
-                    price_entered_at = 0.0;
-                    in_entry_cycle = false;  // exit cycle
+                    pending_exit = true;  // exit next day
 
                 } else {  // case: continue
 
                     cout << "Still in trade. Adding unrealized pnl." << endl;
-
                     unrealized_pnl = compute_current_pnl(
                         share_quantity, price_entered_at, 
                         close_val, strategy.entry_rules[0].direction  //! fix incase directions not all same
                     );
+
+                    // TODO: fix unrealized and final pnl variable names and values
+                    // TODO: currently is a bit of a mess and confusing
                     pnl_update_val += unrealized_pnl;  // running cycle sum
 
                 }
             }
 
-            // update previous day values
-            previous_values = current_values;  // after using
+            cout << "----------------------------" << endl;
+
+        }
+
+        // fallback if pending exit after days end
+        if (pending_exit) {
+
+            cout << "Exiting the trade..." << endl;
+
+            price_exited_at = market_data.at(last_day_in_data)[0];  // open of last day (fallback)
+
+            // compute num shares to use in trade
+            share_quantity = compute_share_quantity(price_entered_at, strategy.pos_settings.size_percentage);
+
+            // update exited pnl
+            realized_pnl = compute_current_pnl(
+                share_quantity, price_entered_at, 
+                price_exited_at, strategy.entry_rules[0].direction  //! fix incase directions not all same
+            );
+
+            final_pnl += realized_pnl;  // add to final pnl
+
+            // reset values
+            pnl_update_val = 0.0;  // not in trade
+            price_entered_at = 0.0;
+
+            // update states
+            in_entry_cycle = false;
+            pending_exit = false;
 
         }
 

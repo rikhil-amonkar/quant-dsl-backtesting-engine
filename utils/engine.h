@@ -199,15 +199,15 @@ private:  // local
 
         bool condition_res{};
         if (operation == "crossover" || operation == "crossunder") {  // case: cross ops
-            cout << "Rule (Cross): " + operation << endl;
             condition_res = cross_condition_operation(
                 left_val, right_val, operation,
                 curr_day, left_operand, right_operand, 
                 previous_values, entry_price
             );
+            cout << "Rule (Cross): " << operation << "(" << left_val << ", " << right_val << ")" << " --> " << condition_res << endl;
         } else {  // case: (>, <, >=, <=) --> not cross ops
-            cout << "Rule (Basic): " + to_string(left_val) + " " + operation + " " + to_string(right_val) << endl;
             condition_res = basic_condition_operation(left_val, right_val, operation);
+            cout << "Rule (Basic): " + to_string(left_val) + " " + operation + " " + to_string(right_val) << " --> " << condition_res << endl;
         }
 
         return condition_res;  // store bool
@@ -258,16 +258,17 @@ public:  // callable outside
 
     auto run_data_through_engine_logic() {
 
-        // store updates indicator values
+        // store daily indicator values
         map<string, float> current_values;
         map<string, float> previous_values;
-        float value{};
-        int min_start_day{};  // start to 0
+
+        // state and buy info
         bool in_entry_cycle = false;  // trade state
-        float pnl_update_val{};  // track entry session
-        float final_pnl{};  // final profit/loss
+        float share_quantity{};
+
         float unrealized_pnl{};  // if were to exit
         float realized_pnl{};  // after official exit
+        float final_pnl{};  // final profit/loss
 
         // track entry/exit prices for pnl
         float price_entered_at{};
@@ -275,12 +276,10 @@ public:  // callable outside
         bool pending_entry{};
         bool pending_exit{};
 
-        // portfolio info
-        float share_quantity{};
-
         cout << "Initial Capital: $" << capital << endl;
 
         // get minimum start day needed for compute
+        int min_start_day{};  // start to 0
         for (auto indicator : strategy.indicators) {
             if (min_start_day < indicator.period) {
                 min_start_day = indicator.period;  // update
@@ -309,7 +308,6 @@ public:  // callable outside
             " | Close: " << close_val << 
             " | Volume: " << total_volume << 
             endl; 
-
             cout << "----------------------------" << endl;
 
             // skip until valid day for indicator compute
@@ -321,6 +319,8 @@ public:  // callable outside
             // enter at the open value of day after
             if (pending_entry) {  // open trade
 
+                cout << "Entered trade!" << endl;
+                cout << "----------------------------" << endl;
                 price_entered_at = open_val;  // entry price
 
                 // compute num shares to use in trade
@@ -335,7 +335,8 @@ public:  // callable outside
             // exit at the open value of day after
             if (pending_exit) {  // close trade
 
-                cout << "Exiting trade..." << endl;
+                cout << "Exited trade!" << endl;
+                cout << "----------------------------" << endl;
                 price_exited_at = open_val;  // exit price
 
                 // compute num shares to use in trade
@@ -350,7 +351,7 @@ public:  // callable outside
                 final_pnl += realized_pnl;  // add to final pnl
 
                 // reset values
-                pnl_update_val = 0.0;  // not in trade
+                unrealized_pnl = 0.0;  // not in trade
                 price_entered_at = 0.0;
 
                 // update states
@@ -361,6 +362,7 @@ public:  // callable outside
             }
 
             // compute indicator values per indicator type
+            float value{};
             for (auto indicator : strategy.indicators) {
                 value = compute_indicator(curr_day, indicator.type, indicator.source, indicator.period);
                 current_values[indicator.name] = value;  // store value variables
@@ -372,6 +374,7 @@ public:  // callable outside
             if (!in_entry_cycle) {
 
                 // check if all entry rules are valid
+                cout << "-- Entry Conditions --" << endl;
                 vector<bool> entry_condition_outcomes{};  // store condition true/false
                 for (auto entry_rule : strategy.entry_rules) {
                     for (auto condition : entry_rule.conditions) {
@@ -385,8 +388,8 @@ public:  // callable outside
                             operation, curr_day, left_operand, right_operand, 
                             current_values, previous_values, price_entered_at
                         );
-                        cout << "Entry Condition (0,1): " << entry_condition_res << endl;
                         entry_condition_outcomes.push_back(entry_condition_res);  // store bool
+                    
                     }
                 }
 
@@ -400,10 +403,8 @@ public:  // callable outside
                 // check entry rule conditions with operator
                 if (entry_true) {
 
-                    cout << "Day: " << curr_day << " passed the entry rule...entering trade." << endl;
-
                     // update trade entry variables
-                    pnl_update_val = 0.0;
+                    unrealized_pnl = 0.0;
                     price_exited_at = 0.0;
                     pending_entry = true;  // enter next day
 
@@ -415,9 +416,11 @@ public:  // callable outside
 
             } else {  // case: when already in a trade
 
-                cout << "Inside of an entry cycle trade..." << endl;
+                cout << "Currently in trade..." << endl;
+                cout << "----------------------------" << endl;
 
                 // check exit conditions incase trade is invalid
+                cout << "-- Exit Conditions --" << endl;
                 vector<bool> exit_condition_outcomes{};  // store condition true/false
                 for (auto exit_rule : strategy.exit_rules) {
                     for (auto condition : exit_rule.conditions) {                    
@@ -432,10 +435,12 @@ public:  // callable outside
                             operation, curr_day, left_operand, right_operand, 
                             current_values, previous_values, price_entered_at
                         );
-                        cout << "Exit Condition (0,1): " << exit_condition_res << endl;
                         exit_condition_outcomes.push_back(exit_condition_res);  // store bool
+
                     }
                 }
+
+                cout << "----------------------------" << endl;
 
                 // any instance of exit rule being true
                 bool exit_true = any_of(  // lambda func
@@ -446,26 +451,19 @@ public:  // callable outside
 
                 // state conditionals during entry
                 if (curr_day == last_day_in_data) {  // case: hit last day (while still in trade)
-
                     cout << "End of search days reached while still in trade." << endl;
-                    final_pnl += pnl_update_val;  // add to final pnl
+                    final_pnl += unrealized_pnl;  // add all trade pnl's to final pnl
 
                 } else if (exit_true) {  // case: exit rule hit
-
                     cout << "Exit rule has been hit while in trade." << endl;
                     pending_exit = true;  // exit next day
 
                 } else {  // case: continue
-
                     cout << "Still in trade. Adding unrealized pnl." << endl;
-                    unrealized_pnl = compute_current_pnl(
+                    unrealized_pnl += compute_current_pnl(  // running cycle sum
                         share_quantity, price_entered_at, 
                         close_val, strategy.entry_rules[0].direction  //! fix incase directions not all same
                     );
-
-                    // TODO: fix unrealized and final pnl variable names and values
-                    // TODO: currently is a bit of a mess and confusing
-                    pnl_update_val += unrealized_pnl;  // running cycle sum
 
                 }
             }
@@ -477,7 +475,8 @@ public:  // callable outside
         // fallback if pending exit after days end
         if (pending_exit) {
 
-            cout << "Exiting the trade..." << endl;
+            cout << "Exited trade!" << endl;
+            cout << "----------------------------" << endl;
 
             price_exited_at = market_data.at(last_day_in_data)[0];  // open of last day (fallback)
 
@@ -493,7 +492,7 @@ public:  // callable outside
             final_pnl += realized_pnl;  // add to final pnl
 
             // reset values
-            pnl_update_val = 0.0;  // not in trade
+            unrealized_pnl = 0.0;  // not in trade
             price_entered_at = 0.0;
 
             // update states

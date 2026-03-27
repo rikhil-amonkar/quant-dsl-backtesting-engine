@@ -197,20 +197,20 @@ private:  // local
         float left_val = evaluate_condition_vals(curr_day, left_operand, current_values, entry_price);  // left op val
         float right_val = evaluate_condition_vals(curr_day, right_operand, current_values, entry_price);  // right op val     
 
-        bool condition_res{};
+        bool outcome_of_condition{};
         if (operation == "crossover" || operation == "crossunder") {  // case: cross ops
-            condition_res = cross_condition_operation(
+            outcome_of_condition = cross_condition_operation(
                 left_val, right_val, operation,
                 curr_day, left_operand, right_operand, 
                 previous_values, entry_price
             );
-            cout << "Rule (Cross): " << operation << "(" << left_val << ", " << right_val << ")" << " --> " << condition_res << endl;
+            cout << "Rule: " << operation << "(" << left_val << ", " << right_val << ")" << " | " << outcome_of_condition << endl;
         } else {  // case: (>, <, >=, <=) --> not cross ops
-            condition_res = basic_condition_operation(left_val, right_val, operation);
-            cout << "Rule (Basic): " + to_string(left_val) + " " + operation + " " + to_string(right_val) << " --> " << condition_res << endl;
+            outcome_of_condition = basic_condition_operation(left_val, right_val, operation);
+            cout << "Rule: " << left_val << " " << operation << " " << right_val << " | " << outcome_of_condition << endl;
         }
 
-        return condition_res;  // store bool
+        return outcome_of_condition;  // store bool
 
     }
 
@@ -322,9 +322,6 @@ public:  // callable outside
                 cout << "Entered trade!" << endl;
                 cout << "----------------------------" << endl;
                 price_entered_at = open_val;  // entry price
-
-                // compute num shares to use in trade
-                share_quantity = compute_share_quantity(price_entered_at, strategy.pos_settings.size_percentage);
                 
                 // update states
                 in_entry_cycle = true;
@@ -384,11 +381,11 @@ public:  // callable outside
                         string right_operand = condition.right_operand;
                         string operation = condition.operation;  // forms --> (left operator right)
 
-                        bool entry_condition_res = operation_handler(
+                        bool entry_outcome_of_condition = operation_handler(
                             operation, curr_day, left_operand, right_operand, 
                             current_values, previous_values, price_entered_at
                         );
-                        entry_condition_outcomes.push_back(entry_condition_res);  // store bool
+                        entry_condition_outcomes.push_back(entry_outcome_of_condition);  // store bool
                     
                     }
                 }
@@ -400,6 +397,8 @@ public:  // callable outside
                     [](bool b){ return b; }  // bool val
                 );  //! currently checks if ALL are true, could add OR in future
             
+                cout << "----------------------------" << endl;
+
                 // check entry rule conditions with operator
                 if (entry_true) {
 
@@ -407,6 +406,9 @@ public:  // callable outside
                     unrealized_pnl = 0.0;
                     price_exited_at = 0.0;
                     pending_entry = true;  // enter next day
+
+                    cout << "All entry rules have passed for trade." << endl;
+                    cout << "----------------------------" << endl;
 
                     // update previous day values
                     previous_values = current_values;  // after using
@@ -431,11 +433,11 @@ public:  // callable outside
                         string operation = condition.operation;  // forms --> (left operator right)
 
                         //! need to breakdown equation sub-conditions (such as * 0.97 case)
-                        bool exit_condition_res = operation_handler(
+                        bool exit_outcome_of_condition = operation_handler(
                             operation, curr_day, left_operand, right_operand, 
                             current_values, previous_values, price_entered_at
                         );
-                        exit_condition_outcomes.push_back(exit_condition_res);  // store bool
+                        exit_condition_outcomes.push_back(exit_outcome_of_condition);  // store bool
 
                     }
                 }
@@ -455,11 +457,10 @@ public:  // callable outside
                     final_pnl += unrealized_pnl;  // add all trade pnl's to final pnl
 
                 } else if (exit_true) {  // case: exit rule hit
-                    cout << "Exit rule has been hit while in trade." << endl;
+                    cout << "An exit rule has been hit while in trade." << endl;
                     pending_exit = true;  // exit next day
 
                 } else {  // case: continue
-                    cout << "Still in trade. Adding unrealized pnl." << endl;
                     unrealized_pnl += compute_current_pnl(  // running cycle sum
                         share_quantity, price_entered_at, 
                         close_val, strategy.entry_rules[0].direction  //! fix incase directions not all same

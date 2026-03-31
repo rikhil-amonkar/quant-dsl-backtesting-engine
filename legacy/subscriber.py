@@ -8,6 +8,8 @@ socket.connect('tcp://localhost:5555')  # local
 # subscribe to all messages
 socket.setsockopt_string(zmq.SUBSCRIBE, "")
 
+print("Subscriber has been established!")
+
 for i in range(5):
     
     content = socket.recv_string()  # get data

@@ -1,14 +1,28 @@
 import yfinance as yf
 
-# set parameters
-ticker = 'AAPL'
-start = '2023-01-01'
-end = '2023-01-10'
+# get ohlcv values from market based on time period
+def fetch_ohlcv_data_from_market_timeline(ticker: str, start: str, end: str) -> list[float]:
 
-# initialize ticker
-data = yf.download(ticker, start, end)
+    # initialize ticker
+    data = yf.download(ticker, start, end)
 
-# get selected data as dataframe
-subset = data[['Open', 'High', 'Low', 'Close', 'Volume']]
+    # get selected data as dataframe
+    subset = data[["Open", "High", "Low", "Close", "Volume"]]
+    
+    # convert to only value list
+    values = subset.to_numpy().tolist()
+    
+    # {day, [o, h, l, c, v]} --> format 
+    market_data = {}
+    for i, ohlcv in enumerate(values):
+        market_data[i+1] = ohlcv  # store to hashmap
+        
+    return market_data
 
-print(subset)
+# # set parameters
+# ticker = 'AAPL'
+# start = '2023-01-01'
+# end = '2023-01-10'
+
+# result = fetch_ohlcv_data_from_market_timeline(ticker, start, end)
+# print(result)

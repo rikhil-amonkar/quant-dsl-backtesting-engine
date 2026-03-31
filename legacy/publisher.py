@@ -7,6 +7,8 @@ context = zmq.Context()
 socket = context.socket(zmq.PUB)  # sender
 socket.bind('tcp://localhost:5555')  # local
 
+print("Publisher has been initialized!")
+
 while True:
     
     # create data to be sent

@@ -17,12 +17,4 @@ def fetch_ohlcv_data_from_market_timeline(ticker: str, start: str, end: str) -> 
     for i, ohlcv in enumerate(values):
         market_data[i+1] = ohlcv  # store to hashmap
         
-    return market_data
-
-# # set parameters
-# ticker = 'AAPL'
-# start = '2023-01-01'
-# end = '2023-01-10'
-
-# result = fetch_ohlcv_data_from_market_timeline(ticker, start, end)
-# print(result)
+    return 10

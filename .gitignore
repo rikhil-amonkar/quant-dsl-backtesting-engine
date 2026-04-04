@@ -10,3 +10,6 @@ env/
 # workspace configs
 *.vscode
 *.clangd
+
+# cmake build files
+build/

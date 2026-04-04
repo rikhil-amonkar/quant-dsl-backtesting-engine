@@ -3,7 +3,7 @@
 #include <vector>
 #include <fstream>
 
-#include "./utils/data.h"
+#include "./utils/binder.h"
 #include "./utils/structs.h"
 #include "./utils/lexer.h"
 #include "./utils/parser.h"
@@ -11,7 +11,11 @@
 
 using namespace std;
 
+//! not needed --> cmake build system
 // run command: g++ -std=c++20 main.cpp -o main.out && ./main.out
+
+// immutable array to define possible bar fields
+const array<string, 5> bar_fields = {"open", "high", "low", "close", "volume"};
 
 // read lines from strategy file
 Strategy read_strategy_file(string filename) {  // ref to struct
@@ -51,12 +55,20 @@ int main() {
 
     cout << "Strategy struct's members have been populate with file attributes!\n" << endl;
 
+    // timeline params
+    string ticker = "NVDA";
+    string start = "2024-01-01";
+    string end = "2025-01-01";
+
+    auto market_data = get_market_data_over_timeline(ticker, start, end);  // fetch data
+
     float capital = 100000.0f;  // initial portfolio capital
     BacktestingEngine engine(market_data, bar_fields, capital, strategy);  // main engine
-    auto [final_pnl, updated_capital, capital_diff_percent] = engine.run_data_through_engine_logic();  // simulate pnl
+    auto [num_entries, final_pnl, updated_capital, capital_diff_percent] = engine.run_data_through_engine_logic();  // simulate pnl
 
     cout << "\n============================" << endl;
-    cout << "\nFinal Realized PnL: $" << final_pnl << endl;  // realized --> after exit
+    cout << "\nTotal Entries: " << num_entries << endl;  // times entered
+    cout << "Final Realized PnL: $" << final_pnl << endl;  // realized --> after exit
     cout << "Updated Capital: $" << updated_capital << endl;
 
     if (updated_capital < capital) {  // case: loss

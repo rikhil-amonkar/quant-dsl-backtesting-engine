@@ -22,7 +22,7 @@ class BacktestingEngine {
 
 private:  // local
 
-    map<int, vector<int>> market_data;
+    map<int, vector<float>> market_data;
     array<string, 5> bar_fields;
     float capital;
     Strategy strategy;
@@ -253,7 +253,7 @@ private:  // local
 public:  // callable outside
 
     BacktestingEngine(  // engine constructor
-        const map<int, vector<int>>& m, const array<string, 5>& b, float c, Strategy& s
+        const map<int, vector<float>>& m, const array<string, 5>& b, float c, Strategy& s
     ) : market_data(m), bar_fields(b), capital(c), strategy(s) {};
 
     auto run_data_through_engine_logic() {
@@ -261,6 +261,8 @@ public:  // callable outside
         // store daily indicator values
         map<string, float> current_values;
         map<string, float> previous_values;
+
+        int num_entries{};
 
         // state and buy info
         bool in_entry_cycle = false;  // trade state
@@ -324,6 +326,7 @@ public:  // callable outside
                 price_entered_at = open_val;  // entry price
                 
                 // update states
+                num_entries += 1;
                 in_entry_cycle = true;
                 pending_entry = false;
 
@@ -503,10 +506,11 @@ public:  // callable outside
         }
 
         // update capital based on results
+        cout << "Capital: " << capital << ", Final PNL: " << final_pnl << endl;
         float updated_capital = capital + final_pnl;
         float capital_diff_percent = compute_pnl_percentage_diff(updated_capital);  // % pnl
 
-        return make_tuple(final_pnl, updated_capital, capital_diff_percent);
+        return make_tuple(num_entries, final_pnl, updated_capital, capital_diff_percent);
 
     }
 

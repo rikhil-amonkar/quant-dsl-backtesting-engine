@@ -12,6 +12,6 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(pybind11)
 
-add_executable(bind test_bind.cpp)
+add_executable(main main.cpp)
 
-target_link_libraries(bind PRIVATE pybind11::embed)
+target_link_libraries(main PRIVATE pybind11::embed)

@@ -14,10 +14,11 @@ int main() {
 
     auto market_data = get_market_data_over_timeline(ticker, start, end);
 
-    // for (auto const& [day, data] : market_data) {
-    //     cout << "Day: " << day << endl;
-    // }
-
-    cout << "Day: " << market_data << endl;
+    for (auto const& [day, data] : market_data) {
+        cout << "Day: " << day << endl;
+        for (auto const& value : data) {
+            cout << value << endl;
+        }
+    }
 
 }

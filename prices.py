@@ -17,4 +17,4 @@ def fetch_ohlcv_data_from_market_timeline(ticker: str, start: str, end: str) -> 
     for i, ohlcv in enumerate(values):
         market_data[i+1] = ohlcv  # store to hashmap
         
-    return 10
+    return dict(market_data)

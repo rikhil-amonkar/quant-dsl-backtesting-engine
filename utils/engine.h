@@ -291,6 +291,8 @@ public:  // callable outside
         // point to last day from ordered hashmap
         auto last_day_ptr = prev(market_data.end());  // end = after last --> no data, prev
         int last_day_in_data = last_day_ptr->first;  // deref
+        
+        ofstream outFile("log.txt");  // init output file
 
         // print each data point from hashmap
         for (auto market_val : market_data) {  // auto data type
@@ -311,6 +313,15 @@ public:  // callable outside
             " | Volume: " << total_volume << 
             endl; 
             cout << "----------------------------" << endl;
+
+            // write to day data to log file
+            outFile << "Day: " << curr_day << 
+            " | Open: " << open_val << 
+            " | High: " << high_val << 
+            " | Low: " << low_val << 
+            " | Close: " << close_val << 
+            " | Volume: " << total_volume << 
+            endl;
 
             // skip until valid day for indicator compute
             if (curr_day < min_start_day) {
@@ -505,8 +516,9 @@ public:  // callable outside
 
         }
 
+        outFile.close();  // clean
+
         // update capital based on results
-        cout << "Capital: " << capital << ", Final PNL: " << final_pnl << endl;
         float updated_capital = capital + final_pnl;
         float capital_diff_percent = compute_pnl_percentage_diff(updated_capital);  // % pnl
 

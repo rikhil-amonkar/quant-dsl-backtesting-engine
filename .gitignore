@@ -13,3 +13,6 @@ env/
 
 # cmake build files
 build/
+
+# logs
+log.txt

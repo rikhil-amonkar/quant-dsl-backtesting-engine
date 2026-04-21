@@ -312,6 +312,7 @@ public:  // callable outside
             " | Close: " << close_val << 
             " | Volume: " << total_volume << 
             endl; 
+            cout << "Current-Day PnL: " << unrealized_pnl << endl;
             cout << "----------------------------" << endl;
 
             // write to day data to log file

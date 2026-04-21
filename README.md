@@ -12,6 +12,7 @@ This project is a qaunt-based backtesting engine built in C++. I made this proje
 
 - **yfinance** : fetch market data in Python
 - **pybind11** : call Python functions from C++ via built-in interpretor
+- **matplotlib** : use PnL output data from engine to visualize buy/sells
 
 # Environment Setup
 

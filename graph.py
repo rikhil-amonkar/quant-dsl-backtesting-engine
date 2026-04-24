@@ -1,9 +1,10 @@
+from cProfile import label
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
 import numpy as np
 
 # plot pnl results and market prices to graph visual
-def plot_pnl_values_to_graph(y_vals, daily_hash_update) -> None:
+def plot_pnl_values_to_graph(running_capital, daily_hash_update) -> None:
     
     daily_info_dump_parsed = [open_val for open_val in list(daily_hash_update.values())]  # open val
     # day_open_prices = [val[0] for i, val in enumerate(daily_info_dump_parsed) if i < len(y_vals)]
@@ -23,13 +24,22 @@ def plot_pnl_values_to_graph(y_vals, daily_hash_update) -> None:
     
     # print(len(day_open_prices), len(x_vals), len(y_vals))
 
-    fig, ax = plt.subplots()
+    fig, ax1 = plt.subplots()
     # ax.plot(x_vals, y_vals, label="PnL")
-    ax.plot(x_vals, day_open_prices, label="Open Price")
-    ax.plot(x_vals, day_close_prices, label="Close Price")
-    ax.plot(x_vals, day_high_prices, label="High Price")
-    ax.plot(x_vals, day_low_prices, label="Low Price")
-    ax.legend()
+    ax1.plot(x_vals, day_open_prices, label="Open Price")
+    ax1.plot(x_vals, day_close_prices, label="Close Price")
+    ax1.plot(x_vals, day_high_prices, label="High Price")
+    ax1.plot(x_vals, day_low_prices, label="Low Price")
+    ax1.set_ylabel("Price")
+    # ax1.legend()
+    
+    ax1.yaxis.set_major_locator(MaxNLocator(nbins=10))
+    
+    ax2 = ax1.twinx()
+    ax2.plot(x_vals, running_capital, label="Current Capital")  # from simulation
+    ax2.set_ylabel("Capital ($)")
+    
+    ax2.yaxis.set_major_locator(MaxNLocator(nbins=10))
     
     # print("No errors after plot.")    
     # print(y_vals)
@@ -38,5 +48,5 @@ def plot_pnl_values_to_graph(y_vals, daily_hash_update) -> None:
     # y_ax_min, y_ax_max = min(y_vals+day_open_prices), max(y_vals+day_open_prices)
     # step = (y_ax_max - y_ax_min) / len(y_vals)  # max-min/intervals
     # plt.yticks(np.arange(y_ax_min, y_ax_max, step))
-    ax.yaxis.set_major_locator(MaxNLocator(nbins=10))
+    ax1.yaxis.set_major_locator(MaxNLocator(nbins=10))
     plt.show()

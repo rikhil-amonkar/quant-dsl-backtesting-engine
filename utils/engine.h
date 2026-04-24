@@ -278,8 +278,8 @@ public:  // callable outside
         bool pending_entry{};
         bool pending_exit{};
 
-        // track mid-level pnls
-        vector<float> sub_realized_pnls;  //! may remove
+        // track mid-level capital updates
+        vector<float> cycling_updated_capital;
 
         cout << "Initial Capital: $" << capital << endl;
 
@@ -327,6 +327,9 @@ public:  // callable outside
             " | Volume: " << total_volume << 
             endl;
 
+            // cout << "Updated Capital: " << (final_pnl + capital) << endl;
+            cycling_updated_capital.push_back(final_pnl + capital);  // store updating capital
+
             // skip until valid day for indicator compute
             if (curr_day < min_start_day) {
                 cout << "No signal yet. Need more information. Skipping current day." << endl;
@@ -364,7 +367,6 @@ public:  // callable outside
                 );
 
                 final_pnl += realized_pnl;  // add to final pnl
-                sub_realized_pnls.push_back(realized_pnl);
 
                 // reset values
                 unrealized_pnl = 0.0;  // not in trade
@@ -527,7 +529,7 @@ public:  // callable outside
         float updated_capital = capital + final_pnl;
         float capital_diff_percent = compute_pnl_percentage_diff(updated_capital);  // % pnl
 
-        return make_tuple(num_entries, final_pnl, sub_realized_pnls, updated_capital, capital_diff_percent);
+        return make_tuple(num_entries, final_pnl, cycling_updated_capital, updated_capital, capital_diff_percent);
 
     }
 

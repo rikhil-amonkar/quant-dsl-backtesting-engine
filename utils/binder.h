@@ -35,11 +35,11 @@ auto get_market_data_over_timeline(string ticker, string start, string end) {
         auto market_data = result.cast<map<int, vector<float>>>();
 
         // graph pnl --> no return
-        vector<float> temp = {100.0, 200.0, 300.0, 350.0, 200.0, 450.0};  //! temp values
+        vector<float> temp_pnl_res = {100.0, 200.0, 300.0, 350.0, 200.0, 450.0};  //! temp values
 
         cout << "Running!" << endl;
 
-        graph_pnl_data(temp, market_data);
+        graph_pnl_data(temp_pnl_res, market_data);
 
         cout << "Complete!" << endl;
 

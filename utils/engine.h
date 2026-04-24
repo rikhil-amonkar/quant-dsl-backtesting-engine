@@ -278,6 +278,9 @@ public:  // callable outside
         bool pending_entry{};
         bool pending_exit{};
 
+        // track mid-level pnls
+        vector<float> sub_realized_pnls;  //! may remove
+
         cout << "Initial Capital: $" << capital << endl;
 
         // get minimum start day needed for compute
@@ -361,6 +364,7 @@ public:  // callable outside
                 );
 
                 final_pnl += realized_pnl;  // add to final pnl
+                sub_realized_pnls.push_back(realized_pnl);
 
                 // reset values
                 unrealized_pnl = 0.0;  // not in trade
@@ -523,7 +527,7 @@ public:  // callable outside
         float updated_capital = capital + final_pnl;
         float capital_diff_percent = compute_pnl_percentage_diff(updated_capital);  // % pnl
 
-        return make_tuple(num_entries, final_pnl, updated_capital, capital_diff_percent);
+        return make_tuple(num_entries, final_pnl, sub_realized_pnls, updated_capital, capital_diff_percent);
 
     }
 

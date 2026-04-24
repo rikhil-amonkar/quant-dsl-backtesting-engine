@@ -64,7 +64,7 @@ int main() {
 
     float capital = 100000.0f;  // initial portfolio capital
     BacktestingEngine engine(market_data, bar_fields, capital, strategy);  // main engine
-    auto [num_entries, final_pnl, updated_capital, capital_diff_percent] = engine.run_data_through_engine_logic();  // simulate pnl
+    auto [num_entries, final_pnl, sub_realized_pnls, updated_capital, capital_diff_percent] = engine.run_data_through_engine_logic();  // simulate pnl
 
     cout << "\n============================" << endl;
     cout << "\nTotal Entries: " << num_entries << endl;  // times entered
@@ -78,6 +78,11 @@ int main() {
     } else {  // case: constant
         cout << "Percent Difference in Capital: (" << capital_diff_percent << "%)" << endl;
     }
+
+    //! meant to store each realized pnl one-by-one
+    // for (auto pnl : sub_realized_pnls) {
+    //     cout << "Sub-Level Realized PNL: " << pnl << endl;
+    // }
 
     return 0;
 

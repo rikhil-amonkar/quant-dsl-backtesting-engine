@@ -23,7 +23,6 @@ auto get_market_data_over_timeline(string ticker, string start, string end) {
         )");
         py::module_::import("yfinance");
         py::module_::import("matplotlib");
-        py::module_::import("numpy");
 
         py::module_ price_py_script = py::module_::import("prices");  // py
         py::object fetch_market_data = price_py_script.attr("fetch_ohlcv_data_from_market_timeline");  // func

@@ -57,8 +57,8 @@ int main() {
 
     // timeline params
     string ticker = "NVDA";
-    string start = "2024-01-01";
-    string end = "2025-01-01";
+    string start = "2025-01-01";
+    string end = "2026-01-01";
 
     auto market_data = get_market_data_over_timeline(ticker, start, end);  // fetch data
 
@@ -79,17 +79,7 @@ int main() {
         cout << "Percent Difference in Capital: (" << capital_diff_percent << "%)" << endl;
     }
 
-    // cout << "Worked!" << endl;
-
     graph_market_and_capital_data(market_data, cycling_updated_capital);  // plot to graph
-
-    // cout << "Worked Again!" << endl;
-
-    //! meant to store each updated capital value
-    // for (auto pnl : cycling_updated_capital) {
-    //     cout << "Sub-Level Realized PNL: " << pnl << endl;
-    // }
-    // cout << "Size: " << cycling_updated_capital.size() << endl;
 
     return 0;
 

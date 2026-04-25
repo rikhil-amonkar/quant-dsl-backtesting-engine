@@ -320,6 +320,7 @@ public:  // callable outside
 
             // write to day data to log file
             outFile << "Day: " << curr_day << 
+            " | In Entry: " << in_entry_cycle <<
             " | Open: " << open_val << 
             " | High: " << high_val << 
             " | Low: " << low_val << 
@@ -489,6 +490,8 @@ public:  // callable outside
 
                 }
             }
+
+            previous_values = current_values;  // update daily vals
 
             cout << "----------------------------" << endl;
 

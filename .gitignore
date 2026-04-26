@@ -14,5 +14,6 @@ env/
 # cmake build files
 build/
 
-# logs
+# logs + graphs
 log.txt
+simulated_backtesting_pnl_graph.png

@@ -1,12 +1,12 @@
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
-from pandas import col
 
 # plot pnl results and market prices to graph visual
 def plot_pnl_values_to_graph(running_capital, daily_hash_update) -> None:
     
     daily_info_dump_parsed = [open_val for open_val in list(daily_hash_update.values())]  # open val
     initial_capital = [running_capital[0]] * len(running_capital)
+    final_capital = [running_capital[-1]] * len(running_capital)
     
     # ohlcv breakdown --> volume too large
     day_open_prices = [val[0] for val in daily_info_dump_parsed]
@@ -24,6 +24,7 @@ def plot_pnl_values_to_graph(running_capital, daily_hash_update) -> None:
         
     ax2 = ax1.twinx()
     init_cap_line = ax2.plot(x_vals, initial_capital, linestyle=":", label="Initial Capital", color="grey")  # starting cap (dotted)
+    fin_cap_line = ax2.plot(x_vals, final_capital, linestyle=":", label="Final Capital", color="grey")  # starting cap (dotted)
     curr_cap_line = ax2.plot(x_vals, running_capital, label="Current Capital", drawstyle="steps-post", color="black")  # hold val till next point
     
     # set axis titles
@@ -61,10 +62,10 @@ def plot_pnl_values_to_graph(running_capital, daily_hash_update) -> None:
     ax1.set_title("Portfolio Value Over Simulated Backtest Period")
     ax1.set_xlabel("Days")
     
-    all_lines = open_line + close_line + high_line + low_line + init_cap_line + curr_cap_line  # combine
+    all_lines = open_line + close_line + high_line + low_line + curr_cap_line  # combine
     all_labels = [line.get_label() for line in all_lines]  # extract labels
     
-    ax1.legend(all_lines, all_labels, loc=4)
+    ax2.legend(all_lines, all_labels, loc=4).set_zorder(100)
     
     plt.savefig("simulated_backtesting_pnl_graph.png")
     plt.show()

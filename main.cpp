@@ -57,8 +57,8 @@ int main() {
 
     // timeline params
     string ticker = "NVDA";
-    string start = "2025-01-01";
-    string end = "2026-01-01";
+    string start = "2024-01-01";
+    string end = "2025-01-01";
 
     auto market_data = get_market_data_over_timeline(ticker, start, end);  // fetch data
 

@@ -1,0 +1,13 @@
+STRATEGY SMA_Mean_Reversion_Exit
+
+INDICATOR short_sma = SMA(close, 5)
+INDICATOR long_sma = SMA(close, 10)
+
+ENTRY long crossover(short_sma, long_sma)
+
+EXIT close_position close >= entry_price * 1.05
+EXIT close_position close <= entry_price * 0.95
+
+POSITION size_percent = 100
+POSITION max_positions = 1
+POSITION allow_short = false

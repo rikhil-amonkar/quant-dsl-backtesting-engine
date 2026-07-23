@@ -1,0 +1,12 @@
+STRATEGY SMA_Fast_Crossover
+
+INDICATOR short_sma = SMA(close, 3)
+INDICATOR long_sma = SMA(close, 8)
+
+ENTRY long crossover(short_sma, long_sma)
+
+EXIT close_position crossunder(short_sma, long_sma)
+
+POSITION size_percent = 100
+POSITION max_positions = 1
+POSITION allow_short = false

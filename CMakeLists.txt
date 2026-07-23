@@ -15,3 +15,7 @@ FetchContent_MakeAvailable(pybind11)
 add_executable(main main.cpp)
 
 target_link_libraries(main PRIVATE pybind11::embed)
+
+add_executable(benchmark benchmark/benchmark.cpp)
+
+target_link_libraries(benchmark PRIVATE pybind11::embed)
